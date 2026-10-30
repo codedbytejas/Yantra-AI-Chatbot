@@ -48,7 +48,7 @@
     activeChatId: null,
     settings: { ...DEFAULT_SETTINGS },
     voiceConfig: { ...DEFAULT_VOICE_CONFIG },
-    theme: 'dark',
+    theme: 'light',
     viewMode: 'split', // 'split' | 'visor' | 'chat'
     companionState: 'idle', // 'idle' | 'listening' | 'thinking' | 'speaking' | 'interrupted'
     isGenerating: false,
@@ -960,8 +960,8 @@
   // LOCAL STORAGE & PERSISTENCE
   // ============================================================================
   function loadPersistedData() {
-    // Theme
-    const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'dark';
+    // Theme (Default white/light)
+    const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'light';
     applyTheme(savedTheme);
 
     // View Mode ('split' | 'visor' | 'chat')
