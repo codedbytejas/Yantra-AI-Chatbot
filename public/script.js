@@ -14,7 +14,7 @@
     CHATS: 'yantra_ai_chats_v2',
     ACTIVE_CHAT_ID: 'yantra_ai_active_chat_id_v2',
     SETTINGS: 'yantra_ai_settings_v2',
-    THEME: 'yantra_ai_theme_v2',
+    THEME: 'yantra_ai_theme_v3',
     VIEW_MODE: 'yantra_ai_view_mode_v2',
     VOICE_CONFIG: 'yantra_ai_voice_config_v2'
   };
