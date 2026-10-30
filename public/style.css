@@ -2498,21 +2498,22 @@ html, body {
     height: calc(100% - 52px);
   }
 
-  /* Split View: Sleek compact visor header on mobile */
+  /* Split View: Sleek compact visor header on mobile without clipping */
   .companion-workspace.layout-split .companion-stage {
     flex: 0 0 auto;
     max-width: 100%;
     width: 100%;
-    max-height: 145px;
+    height: auto;
+    max-height: none;
     border-right: none;
     border-bottom: 1px solid var(--border-subtle);
-    padding: 6px 8px;
-    overflow: hidden;
+    padding: 8px 10px 10px;
+    overflow: visible;
     background: radial-gradient(circle at 50% 0%, rgba(2, 132, 199, 0.08) 0%, transparent 80%), var(--bg-main);
   }
 
   .companion-workspace.layout-split .companion-card {
-    gap: 6px;
+    gap: 8px;
     max-width: 100%;
   }
 
@@ -2521,61 +2522,74 @@ html, body {
   }
 
   .companion-workspace.layout-split .avatar-visor {
-    height: 95px;
-    max-width: 280px;
-    border-radius: 24px;
+    height: 84px;
+    max-width: 260px;
+    border-radius: 22px;
     margin: 0 auto;
   }
 
   .companion-workspace.layout-split .ai-eye {
-    width: 48px;
-    height: 42px;
+    width: 44px;
+    height: 38px;
   }
 
   .companion-workspace.layout-split .ai-iris {
-    border-radius: 14px;
+    border-radius: 12px;
     border-width: 2px;
   }
 
   .companion-workspace.layout-split .ai-pupil {
-    width: 22px;
-    height: 24px;
+    width: 18px;
+    height: 20px;
   }
 
   .companion-workspace.layout-split .eyes-container {
-    gap: 18px;
+    gap: 16px;
   }
 
   .companion-workspace.layout-split .avatar-waveform-wrapper {
-    height: 14px;
+    height: 12px;
     bottom: 4px;
     gap: 2px;
   }
 
   .companion-workspace.layout-split .visor-touch-prompt {
-    font-size: 0.52rem;
-    bottom: 2px;
+    display: none; /* Hidden inside compact visor to avoid text clutter */
   }
 
   .companion-workspace.layout-split .companion-controls-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
     gap: 6px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2px 0 0;
   }
 
   .companion-workspace.layout-split .btn-voice-mic {
     padding: 6px 12px;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
+    height: 32px;
+    min-height: 32px;
     gap: 6px;
+    border-radius: 999px;
+    flex-shrink: 0;
   }
 
   .companion-workspace.layout-split .btn-voice-mic svg {
-    width: 16px;
-    height: 16px;
+    width: 15px;
+    height: 15px;
   }
 
   .companion-workspace.layout-split .btn-interrupt,
   .companion-workspace.layout-split .btn-hands-free {
     padding: 6px 10px;
     font-size: 0.72rem;
+    height: 32px;
+    min-height: 32px;
+    border-radius: 999px;
+    flex-shrink: 0;
   }
 
   .companion-workspace.layout-split .telemetry-dashboard,
@@ -2691,8 +2705,14 @@ html, body {
   }
 
   /* Mobile Welcome Screen */
+  .welcome-screen {
+    padding: 10px 8px;
+    justify-content: flex-start;
+  }
+
   .welcome-hero {
-    padding: 16px 8px 12px;
+    padding: 12px 8px 8px;
+    margin-bottom: 12px;
   }
 
   .welcome-icon-glow {
