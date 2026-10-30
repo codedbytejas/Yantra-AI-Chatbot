@@ -447,7 +447,7 @@
 
     /**
      * Splits response text into clean, natural sentences.
-     * Replaces code blocks with a natural spoken prompt so code is read clearly.
+     * Cleans code blocks, lists, and emojis for smooth mobile voice synthesis.
      */
     prepareSentences(markdownText) {
       if (!markdownText) return [];
@@ -458,20 +458,28 @@
         .replace(/`([^`]+)`/g, '$1')
         .replace(/!\[.*?\]\(.*?\)/g, '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        // Strip markdown decoration
         .replace(/[#*_~>]/g, '')
         .replace(/\|.*?\|/g, '')
-        .replace(/\n{2,}/g, '. ');
+        // Clean markdown list bullets and numbers so speech flows naturally
+        .replace(/^\s*[-*+]\s+/gm, '')
+        .replace(/^\s*\d+\.\s+/gm, '')
+        // Strip emojis that can stall/crash mobile Android/iOS TTS engines
+        .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F1E0}-\u{1F1FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+        .replace(/\n{2,}/g, '. ')
+        .replace(/\n/g, '. ');
 
       // Split by sentence terminators
-      const rawSentences = clean.split(/(?<=[.?!;:\n])\s+/).map(s => s.trim()).filter(s => s.length > 0);
+      const rawSentences = clean.split(/(?<=[.?!;:])\s+/).map(s => s.trim()).filter(s => s.length > 0);
       const chunks = [];
 
       for (const sentence of rawSentences) {
-        // If a single sentence exceeds 180 characters, split by commas or clauses
-        if (sentence.length > 180) {
+        // If a sentence exceeds 120 characters, split by commas/clauses for rock-solid mobile streaming
+        if (sentence.length > 120) {
           const subParts = sentence.split(/(?<=[,])\s+/);
           for (const sub of subParts) {
-            if (sub.trim().length > 0) chunks.push(sub.trim());
+            const trimmed = sub.trim();
+            if (trimmed.length > 0) chunks.push(trimmed);
           }
         } else {
           chunks.push(sentence);
@@ -482,13 +490,13 @@
     },
 
     /**
-     * Speak response automatically.
+     * Speak response automatically with mobile robustness.
      */
     speakResponse(text) {
       if (!state.voiceConfig.autoSpeak) return;
       if (!('speechSynthesis' in window)) return;
 
-      this.stop(); // Stop any previous speech immediately
+      this.stop(); // Stop any previous speech and reset state
 
       const sentences = this.prepareSentences(text);
       if (sentences.length === 0) return;
@@ -501,7 +509,18 @@
       AvatarController.updateState('speaking');
       this.showPlaybackBanner(true);
       this.startKeepAlive();
-      this.playNextSentence();
+
+      // Ensure synthesizer is unpaused
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
+      // 60ms micro-pause allows mobile OS media channel to reset after cancel()
+      setTimeout(() => {
+        if (state.isSpeaking && !state.isPaused) {
+          this.playNextSentence();
+        }
+      }, 60);
     },
 
     playNextSentence() {
@@ -523,22 +542,63 @@
       utterance.pitch = state.voiceConfig.pitch || 1.0;
       utterance.volume = state.voiceConfig.volume || 1.0;
 
-      utterance.onend = () => {
+      // Retain global reference to prevent V8 Garbage Collection mid-speech on mobile
+      window._activeSpeechUtterance = utterance;
+
+      let sentenceFinished = false;
+      const onSentenceDone = () => {
+        if (sentenceFinished) return;
+        sentenceFinished = true;
+        this.clearWatchdog();
+        window._activeSpeechUtterance = null;
         state.speechCurrentIndex++;
-        this.playNextSentence();
+
+        // Brief 30ms gap between sentences gives mobile audio hardware time to cycle
+        setTimeout(() => {
+          if (state.isSpeaking && !state.isPaused) {
+            this.playNextSentence();
+          }
+        }, 30);
+      };
+
+      utterance.onend = () => {
+        onSentenceDone();
       };
 
       utterance.onerror = (e) => {
-        console.warn('Speech synthesis utterance error:', e);
-        state.speechCurrentIndex++;
-        this.playNextSentence();
+        console.warn('Speech synthesis utterance error/skip:', e);
+        onSentenceDone();
       };
+
+      // Watchdog Timer: prevents mobile browsers from freezing if onend is dropped by OS
+      this.clearWatchdog();
+      const words = sentence.split(/\s+/).filter(Boolean).length;
+      const maxMs = Math.max(4500, (words / (state.voiceConfig.rate || 1)) * 650 + 4000);
+      this.watchdogTimer = setTimeout(() => {
+        if (state.isSpeaking && !state.isPaused && !sentenceFinished) {
+          console.warn(`Mobile speech watchdog: advancing stuck sentence ${state.speechCurrentIndex}`);
+          onSentenceDone();
+        }
+      }, maxMs);
+
+      // Mobile synthesis safety: make sure engine is unpaused
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
 
       window.speechSynthesis.speak(utterance);
     },
 
+    clearWatchdog() {
+      if (this.watchdogTimer) {
+        clearTimeout(this.watchdogTimer);
+        this.watchdogTimer = null;
+      }
+    },
+
     pause() {
       if (!state.isSpeaking || state.isPaused) return;
+      this.clearWatchdog();
       if ('speechSynthesis' in window) {
         window.speechSynthesis.pause();
       }
@@ -549,19 +609,30 @@
 
     resume() {
       if (!state.isSpeaking || !state.isPaused) return;
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.resume();
-      }
       state.isPaused = false;
       AvatarController.updateState('speaking');
       this.updatePlaybackControlsUI(false);
+
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.resume();
+      }
+
+      // If speech was paused mid-utterance and mobile engine doesn't resume, restart sentence
+      setTimeout(() => {
+        if (state.isSpeaking && !state.isPaused && !window.speechSynthesis.speaking) {
+          this.playNextSentence();
+        }
+      }, 150);
     },
 
     stop() {
+      this.clearWatchdog();
+      this.stopKeepAlive();
+      window._activeSpeechUtterance = null;
+
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
       }
-      this.stopKeepAlive();
       state.isSpeaking = false;
       state.isPaused = false;
       state.speechQueue = [];
@@ -586,14 +657,16 @@
     },
 
     startKeepAlive() {
-      // Standard Chromium fix for keeping long speech alive
       this.stopKeepAlive();
+      // Safe mobile keep-alive: ONLY resumes if unexpectedly paused by mobile OS ducking.
+      // NEVER calls window.speechSynthesis.pause()!
       state.speechKeepAliveTimer = setInterval(() => {
         if (state.isSpeaking && !state.isPaused && 'speechSynthesis' in window) {
-          window.speechSynthesis.pause();
-          window.speechSynthesis.resume();
+          if (window.speechSynthesis.paused) {
+            window.speechSynthesis.resume();
+          }
         }
-      }, 7000);
+      }, 2500);
     },
 
     stopKeepAlive() {
