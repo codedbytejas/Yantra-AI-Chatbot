@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yantra AI — Autonomous Voice AI Companion</title>
+  <meta name="description" content="A futuristic, autonomous Voice AI Companion powered by Google Gemini, animated cyan AI eyes, hands-free voice interaction, and real-time telemetry.">
+  
+  <!-- Favicon (SVG Cyan Sparkle Visor) -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2300f0ff'%3E%3Cpath d='M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z'/%3E%3C/svg%3E">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@500;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Highlight.js Theme -->
+  <link id="hljs-theme" rel="stylesheet" href="vendor/highlight-dark.min.css">
+  
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Vendor Scripts (Local offline-first) -->
+  <script src="vendor/marked.min.js"></script>
+  <script src="vendor/purify.min.js"></script>
+  <script src="vendor/highlight.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Mobile Sidebar Backdrop -->
+    <div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+
+    <!-- ==================================================================== -->
+    <!-- SIDEBAR NAVIGATION & CHAT HISTORY -->
+    <!-- ==================================================================== -->
+    <aside id="sidebar" class="sidebar" aria-label="Sidebar Navigation">
+      <div class="sidebar-header">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" class="icon-sparkle">
+              <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z" fill="url(#brandGradient)"/>
+              <defs>
+                <linearGradient id="brandGradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#00F0FF"/>
+                  <stop offset="0.5" stop-color="#38BDF8"/>
+                  <stop offset="1" stop-color="#818CF8"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <div class="brand-info">
+            <h1 class="brand-name">Yantra AI</h1>
+            <span class="brand-sub">Voice Companion</span>
+          </div>
+        </div>
+
+        <button id="closeSidebarBtn" class="icon-btn mobile-only" aria-label="Close sidebar">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <!-- New Chat Button -->
+      <div class="sidebar-actions">
+        <button id="newChatBtn" class="btn btn-primary btn-new-chat">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.2" fill="none">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          <span>New Chat</span>
+          <kbd class="shortcut-badge">⌘K</kbd>
+        </button>
+      </div>
+
+      <!-- Search Chat History -->
+      <div class="sidebar-search">
+        <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="searchChatsInput" placeholder="Search conversations..." aria-label="Search conversations">
+        <button id="clearSearchBtn" class="search-clear-btn hidden" aria-label="Clear search">×</button>
+      </div>
+
+      <!-- Chat History List -->
+      <div class="sidebar-content">
+        <div class="history-label">Recent Conversations</div>
+        <div id="chatHistoryList" class="chat-history-list" role="navigation" aria-label="Chat history">
+          <!-- Populated dynamically via script.js -->
+        </div>
+      </div>
+
+      <!-- Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="status-indicator-bar" id="sidebarStatusIndicator">
+          <span class="status-dot status-checking" id="statusDot"></span>
+          <span class="status-text" id="statusText">Checking connection...</span>
+        </div>
+
+        <div class="sidebar-footer-buttons">
+          <button id="themeToggleBtn" class="footer-btn" title="Toggle Dark/Light Mode" aria-label="Toggle theme">
+            <span class="theme-icon-dark">
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </span>
+            <span class="theme-icon-light hidden">
+              <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+            </span>
+            <span class="footer-btn-label">Theme</span>
+          </button>
+
+          <button id="openSettingsBtn" class="footer-btn" title="Settings & Gemini API Key" aria-label="Settings">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            <span class="footer-btn-label">Settings</span>
+          </button>
+
+          <button id="clearAllChatsBtn" class="footer-btn danger" title="Clear all conversations" aria-label="Clear all chats">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span class="footer-btn-label">Clear</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================================================================== -->
+    <!-- MAIN APPLICATION CONTAINER -->
+    <!-- ==================================================================== -->
+    <main class="main-content">
+      
+      <!-- Top Navigation Bar -->
+      <header class="top-bar">
+        <div class="top-bar-left">
+          <button id="toggleSidebarBtn" class="icon-btn" aria-label="Toggle sidebar menu">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+
+          <div class="chat-title-wrapper">
+            <h2 id="currentChatTitle" class="chat-title" title="Click to rename">New Chat</h2>
+            <button id="renameChatBtn" class="icon-btn-tiny" title="Rename conversation" aria-label="Rename conversation">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Center: Layout View Switcher -->
+        <div class="view-mode-switcher" role="radiogroup" aria-label="Interface Layout Mode">
+          <button class="view-mode-btn" data-mode="visor" title="Visor Focus Mode">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="4" width="20" height="16" rx="4"></rect>
+              <circle cx="8" cy="12" r="2.5"></circle>
+              <circle cx="16" cy="12" r="2.5"></circle>
+            </svg>
+            <span>Avatar</span>
+          </button>
+          <button class="view-mode-btn active" data-mode="split" title="Split Screen Companion & Chat">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+              <line x1="12" y1="3" x2="12" y2="21"></line>
+            </svg>
+            <span>Split HUD</span>
+          </button>
+          <button class="view-mode-btn" data-mode="chat" title="Chat Stream Focus">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Chat</span>
+          </button>
+        </div>
+
+        <div class="top-bar-right">
+          <!-- Active State Badge Pill -->
+          <div id="companionStatePill" class="state-pill state-idle" title="Current AI Companion state">
+            <span class="state-indicator-dot"></span>
+            <span id="companionStateLabel" class="state-label">IDLE</span>
+          </div>
+
+          <!-- Model Selection Dropdown -->
+          <div class="model-selector-wrapper">
+            <svg class="model-selector-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z"/>
+            </svg>
+            <select id="modelSelector" class="model-select" aria-label="Select Gemini AI Model">
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite (Fastest)</option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash</option>
+              <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite</option>
+            </select>
+          </div>
+
+          <!-- API Key Status Pill -->
+          <div id="apiKeyStatusPill" class="api-pill checking" title="Click to configure API Key">
+            <span class="pill-dot"></span>
+            <span class="pill-text" id="apiPillText">API</span>
+          </div>
+
+          <!-- Export Chat -->
+          <button id="exportChatBtn" class="icon-btn" title="Export Chat as Markdown" aria-label="Export chat">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+          </button>
+
+          <!-- Clear Current Chat -->
+          <button id="clearChatBtn" class="icon-btn" title="Clear current messages" aria-label="Clear current conversation">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <!-- ==================================================================== -->
+      <!-- COMPANION WORKSPACE (AVATAR STAGE + CONVERSATION STAGE) -->
+      <!-- ==================================================================== -->
+      <div id="companionWorkspace" class="companion-workspace layout-split">
+        
+        <!-- ================================================================ -->
+        <!-- PANE 1: FUTURISTIC AI AVATAR & TELEMETRY HUD -->
+        <!-- ================================================================ -->
+        <section id="companionStage" class="companion-stage" aria-label="AI Companion Avatar and Telemetry">
+          
+          <div class="companion-card">
+            
+            <!-- Visor Header Bar -->
+            <div class="visor-top-bar">
+              <div class="visor-badge-wrapper">
+                <span class="visor-badge pulse-cyan">CORE: ACTIVE</span>
+                <span class="visor-sub-badge">SYNAPSE 3.5</span>
+              </div>
+              <div class="visor-actions">
+                <button id="toggleAudioMuteBtn" class="hud-mini-btn" title="Toggle Auto-Voice Output">
+                  <svg id="audioMuteIcon" viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                  </svg>
+                  <span id="audioMuteLabel">Voice ON</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Visor Avatar Stage -->
+            <div class="visor-screen-outer">
+              <div class="visor-orbital-glow"></div>
+              
+              <!-- Visor Screen -->
+              <div id="avatarVisor" class="avatar-visor state-idle" title="Click to Interrupt speech or start listening" role="button" tabindex="0" aria-label="AI Visor Avatar. Click to interrupt.">
+                
+                <!-- Glossy Glass Highlight -->
+                <div class="visor-reflection-sheen"></div>
+                
+                <!-- Eye Container -->
+                <div class="eyes-container">
+                  
+                  <!-- Left Eye -->
+                  <div class="ai-eye left-eye" id="leftEye">
+                    <div class="ai-eyelid-top"></div>
+                    <div class="ai-iris">
+                      <div class="ai-pupil" id="leftPupil"></div>
+                      <div class="ai-glint"></div>
+                      <div class="ai-scanlines"></div>
+                    </div>
+                    <div class="ai-eyelid-bottom"></div>
+                  </div>
+
+                  <!-- Right Eye -->
+                  <div class="ai-eye right-eye" id="rightEye">
+                    <div class="ai-eyelid-top"></div>
+                    <div class="ai-iris">
+                      <div class="ai-pupil" id="rightPupil"></div>
+                      <div class="ai-glint"></div>
+                      <div class="ai-scanlines"></div>
+                    </div>
+                    <div class="ai-eyelid-bottom"></div>
+                  </div>
+
+                </div>
+
+                <!-- Digital Mouth / Audio Waveform Equalizer -->
+                <div class="avatar-waveform-wrapper" id="avatarWaveform">
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                  <div class="wave-bar"></div>
+                </div>
+
+                <!-- Tactile Interaction Prompt -->
+                <div class="visor-touch-prompt" id="visorTouchPrompt">
+                  <span class="prompt-text">CLICK VISOR OR PRESS SPACE TO INTERRUPT</span>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Voice Controls & Quick Actions -->
+            <div class="companion-controls-bar">
+              
+              <!-- Microphone Button -->
+              <button id="voiceInputBtn" class="btn btn-voice-mic" title="Speak to Yantra AI" aria-label="Microphone input">
+                <div class="mic-ripple-ring"></div>
+                <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.2" fill="none">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+                <span id="voiceInputBtnLabel">Tap to Speak</span>
+              </button>
+
+              <!-- Interrupt Button -->
+              <button id="interruptBtn" class="btn btn-interrupt" title="Immediately halt AI speech / generation" aria-label="Interrupt speech">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                </svg>
+                <span>Interrupt (Space)</span>
+              </button>
+
+              <!-- Hands-Free Continuous Mode Toggle -->
+              <button id="handsFreeBtn" class="btn btn-hands-free" title="Hands-free auto-conversation mode" aria-pressed="false">
+                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                  <polyline points="23 4 23 10 17 10"></polyline>
+                  <polyline points="1 20 1 14 7 14"></polyline>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                <span>Hands-Free</span>
+                <span id="handsFreeIndicator" class="mini-toggle-pill">OFF</span>
+              </button>
+
+            </div>
+
+            <!-- Real-Time Telemetry Dashboard HUD -->
+            <div class="telemetry-dashboard" aria-label="Real-time Subsystem Telemetry">
+              <div class="telemetry-header">
+                <span class="telemetry-title">SUBSYSTEM TELEMETRY</span>
+                <span class="telemetry-mode-tag" id="telemetryStatusBadge">ACTIVE</span>
+              </div>
+              <div class="telemetry-grid">
+                
+                <div class="telemetry-item">
+                  <span class="telemetry-label">DISPLAY SUBSYSTEM</span>
+                  <div class="telemetry-val-row">
+                    <span class="telemetry-dot dot-green" id="telemDisplayDot"></span>
+                    <span class="telemetry-value" id="telemDisplayVal">ONLINE (HTTP/2)</span>
+                  </div>
+                </div>
+
+                <div class="telemetry-item">
+                  <span class="telemetry-label">VOICE INPUT (MIC)</span>
+                  <div class="telemetry-val-row">
+                    <span class="telemetry-dot dot-idle" id="telemMicDot"></span>
+                    <span class="telemetry-value" id="telemMicVal">READY</span>
+                  </div>
+                </div>
+
+                <div class="telemetry-item">
+                  <span class="telemetry-label">AI STATE</span>
+                  <div class="telemetry-val-row">
+                    <span class="telemetry-dot dot-cyan" id="telemStateDot"></span>
+                    <span class="telemetry-value" id="telemStateVal">IDLE</span>
+                  </div>
+                </div>
+
+                <div class="telemetry-item">
+                  <span class="telemetry-label">VOICE SYNTHESIS (TTS)</span>
+                  <div class="telemetry-val-row">
+                    <span class="telemetry-dot dot-green" id="telemTtsDot"></span>
+                    <span class="telemetry-value" id="telemTtsVal">READY (ACTIVE)</span>
+                  </div>
+                </div>
+
+                <div class="telemetry-item">
+                  <span class="telemetry-label">GEMINI CORE</span>
+                  <div class="telemetry-val-row">
+                    <span class="telemetry-dot dot-green" id="telemCoreDot"></span>
+                    <span class="telemetry-value" id="telemCoreVal">gemini-3.5-flash-lite</span>
+                  </div>
+                </div>
+
+                <div class="telemetry-item">
+                  <span class="telemetry-label">SESSION TURNS</span>
+                  <div class="telemetry-val-row">
+                    <span class="telemetry-dot dot-cyan" id="telemTurnsDot"></span>
+                    <span class="telemetry-value" id="telemTurnsVal">0 TURNS</span>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <!-- Voice Synthesizer Controls HUD -->
+            <div class="voice-synthesizer-settings">
+              <div class="voice-synth-header">
+                <span>SPEECH PARAMETERS</span>
+                <span id="activeVoiceNameDisplay" class="active-voice-name">System Default</span>
+              </div>
+              <div class="voice-synth-row">
+                <div class="voice-select-field">
+                  <label for="voiceSelect">AI Companion Voice:</label>
+                  <select id="voiceSelect" class="settings-input voice-select" aria-label="Select Voice">
+                    <!-- Populated dynamically via SpeechSynthesis -->
+                  </select>
+                </div>
+              </div>
+              <div class="voice-sliders-grid">
+                <div class="slider-field">
+                  <div class="slider-label-row">
+                    <span>Speed / Rate</span>
+                    <span id="rateValueDisplay" class="slider-num">1.05x</span>
+                  </div>
+                  <input type="range" id="rateSlider" min="0.75" max="1.5" step="0.05" value="1.05" class="settings-range">
+                </div>
+                <div class="slider-field">
+                  <div class="slider-label-row">
+                    <span>Pitch</span>
+                    <span id="pitchValueDisplay" class="slider-num">1.0x</span>
+                  </div>
+                  <input type="range" id="pitchSlider" min="0.8" max="1.25" step="0.05" value="1.0" class="settings-range">
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ================================================================ -->
+        <!-- PANE 2: REAL-TIME CONVERSATION HUD -->
+        <!-- ================================================================ -->
+        <section id="chatStage" class="chat-stage" aria-label="Conversation stream">
+          
+          <!-- Chat Scrollable Body -->
+          <div id="chatScrollArea" class="chat-scroll-area">
+            
+            <!-- Welcome Screen (Visible when chat has 0 messages) -->
+            <div id="welcomeScreen" class="welcome-screen">
+              <div class="welcome-hero">
+                <div class="welcome-icon-glow">
+                  <svg viewBox="0 0 24 24" fill="none" class="welcome-sparkle-svg">
+                    <path d="M12 2L14.8 9.2L22 12L14.8 14.8L12 22L9.2 14.8L2 12L9.2 9.2L12 2Z" fill="url(#heroGradient)"/>
+                    <defs>
+                      <linearGradient id="heroGradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                        <stop stop-color="#00F0FF"/>
+                        <stop offset="0.5" stop-color="#38BDF8"/>
+                        <stop offset="1" stop-color="#818CF8"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                </div>
+                <h2 class="welcome-heading">Yantra AI Companion Online</h2>
+                <p class="welcome-subheading">
+                  Powered by Google Gemini models with autonomous real-time voice synthesis and interactive cybernetic vision. Speak naturally or type below.
+                </p>
+              </div>
+
+              <!-- Prompt Suggestions Grid -->
+              <div class="suggestions-container">
+                <h3 class="suggestions-title">Try asking aloud or clicking a topic</h3>
+                <div class="suggestions-grid">
+                  
+                  <div class="suggestion-card" data-prompt="Who is the Prime Minister of India?">
+                    <div class="suggestion-icon-badge blue">
+                      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <path d="M12 16v-4"></path>
+                        <path d="M12 8h.01"></path>
+                      </svg>
+                    </div>
+                    <div class="suggestion-content">
+                      <h4 class="suggestion-title">Current Affairs</h4>
+                      <p class="suggestion-desc">"Who is the Prime Minister of India?"</p>
+                    </div>
+                  </div>
+
+                  <div class="suggestion-card" data-prompt="Write a Python program to reverse a string and explain the slicing technique.">
+                    <div class="suggestion-icon-badge purple">
+                      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                      </svg>
+                    </div>
+                    <div class="suggestion-content">
+                      <h4 class="suggestion-title">Code Generation</h4>
+                      <p class="suggestion-desc">"Write a Python program to reverse a string"</p>
+                    </div>
+                  </div>
+
+                  <div class="suggestion-card" data-prompt="Explain artificial intelligence in simple terms with everyday analogies.">
+                    <div class="suggestion-icon-badge amber">
+                      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                        <path d="M9 18h6"></path>
+                        <path d="M10 22h4"></path>
+                        <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"></path>
+                      </svg>
+                    </div>
+                    <div class="suggestion-content">
+                      <h4 class="suggestion-title">Explain a Concept</h4>
+                      <p class="suggestion-desc">"Explain artificial intelligence"</p>
+                    </div>
+                  </div>
+
+                  <div class="suggestion-card" data-prompt="Brainstorm 5 innovative startup ideas combining AI and climate sustainability.">
+                    <div class="suggestion-icon-badge green">
+                      <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                      </svg>
+                    </div>
+                    <div class="suggestion-content">
+                      <h4 class="suggestion-title">Brainstorm Solutions</h4>
+                      <p class="suggestion-desc">"Brainstorm 5 climate tech AI ideas"</p>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- Messages Container (Visible when chat has messages) -->
+            <div id="messagesContainer" class="messages-container hidden">
+              <!-- Dynamically populated by script.js -->
+            </div>
+
+            <!-- Floating Scroll to Bottom Button -->
+            <button id="scrollToBottomBtn" class="scroll-bottom-btn hidden" aria-label="Scroll to bottom">
+              <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2.5" fill="none">
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </button>
+
+          </div>
+
+          <!-- ================================================================ -->
+          <!-- INPUT AREA & VOICE TRANSCRIPTION HUD -->
+          <!-- ================================================================ -->
+          <footer class="chat-input-area">
+            
+            <!-- Live Voice Transcription HUD Banner -->
+            <div id="liveVoiceBanner" class="live-voice-banner hidden" aria-live="assertive">
+              <div class="live-voice-badge">
+                <span class="pulsing-mic-dot"></span>
+                <span id="liveVoiceStatusText">LISTENING...</span>
+              </div>
+              <p id="liveVoiceTranscript" class="live-voice-transcript">Speak now, listening for speech...</p>
+              <button id="cancelVoiceInputBtn" class="cancel-voice-btn" title="Cancel voice input">×</button>
+            </div>
+
+            <!-- Active Voice Speaking Playback HUD Bar -->
+            <div id="speakingPlaybackBanner" class="speaking-playback-banner hidden" aria-live="polite">
+              <div class="playback-info">
+                <div class="speaking-pulse-icon">
+                  <div class="speaking-bar"></div>
+                  <div class="speaking-bar"></div>
+                  <div class="speaking-bar"></div>
+                </div>
+                <span id="speakingStatusLabel" class="speaking-text">Yantra AI is speaking...</span>
+              </div>
+              <div class="playback-controls">
+                <button id="pauseResumeVoiceBtn" class="btn-playback" title="Pause / Resume speech">
+                  <svg id="pauseIcon" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                    <rect x="6" y="4" width="4" height="16"></rect>
+                    <rect x="14" y="4" width="4" height="16"></rect>
+                  </svg>
+                  <svg id="playIcon" class="hidden" viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                  </svg>
+                  <span id="pauseBtnText">Pause</span>
+                </button>
+                <button id="stopVoiceBtn" class="btn-playback danger" title="Stop speech">
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                    <rect x="6" y="6" width="12" height="12"></rect>
+                  </svg>
+                  <span>Stop</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Stop Generating Floating Pill -->
+            <div id="stopGeneratingWrapper" class="stop-generating-wrapper hidden">
+              <button id="stopGeneratingBtn" class="btn btn-stop-generating">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <rect x="6" y="6" width="12" height="12" rx="2"></rect>
+                </svg>
+                <span>Stop Generating</span>
+              </button>
+            </div>
+
+            <!-- Input Box -->
+            <div class="input-card">
+              
+              <!-- Left: Quick Microphone Trigger in Input Bar -->
+              <button id="inlineMicBtn" class="inline-mic-btn" title="Click to speak aloud" aria-label="Voice input">
+                <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                  <line x1="12" y1="19" x2="12" y2="23"></line>
+                  <line x1="8" y1="23" x2="16" y2="23"></line>
+                </svg>
+              </button>
+
+              <textarea
+                id="chatInput"
+                class="chat-textarea"
+                placeholder="Ask or speak anything... (Press Space or click Visor to interrupt)"
+                rows="1"
+                aria-label="Ask Yantra AI"
+              ></textarea>
+
+              <div class="input-card-bottom">
+                <div class="input-tools-left">
+                  <span id="charCount" class="char-count hidden">0 characters</span>
+                </div>
+
+                <div class="input-tools-right">
+                  <button id="sendBtn" class="send-btn" disabled aria-label="Send message">
+                    <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2.2" fill="none">
+                      <line x1="22" y1="2" x2="11" y2="13"></line>
+                      <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Input Disclaimer -->
+            <p class="input-disclaimer">
+              Autonomous voice enabled. Yantra AI speaks all answers aloud. Press <strong>Space</strong> or tap the Visor to interrupt at any moment.
+            </p>
+          </footer>
+
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- SETTINGS MODAL -->
+  <!-- ==================================================================== -->
+  <div id="settingsModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="settingsModalTitle" class="modal-title">Settings & Configuration</h3>
+        <button id="closeSettingsModalBtn" class="icon-btn-tiny" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        
+        <!-- API Key Field -->
+        <div class="settings-group">
+          <label for="apiKeyInput" class="settings-label">
+            Google Gemini API Key
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="link-external">
+              Get Free Key ↗
+            </a>
+          </label>
+          <div class="input-password-wrapper">
+            <input
+              type="password"
+              id="apiKeyInput"
+              class="settings-input"
+              placeholder="AQ... or AIzaSy... (Leave empty to use server .env key)"
+              autocomplete="off"
+            >
+            <button type="button" id="toggleApiKeyVisibilityBtn" class="icon-btn-inline" aria-label="Toggle API Key visibility">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+          <div class="api-key-actions">
+            <button id="testApiKeyBtn" class="btn btn-secondary btn-sm">
+              <span id="testKeySpinner" class="spinner-small hidden"></span>
+              <span id="testKeyText">Test API Connection</span>
+            </button>
+            <span id="testKeyFeedback" class="test-feedback"></span>
+          </div>
+          <p class="settings-help">
+            Configured in <code>.env</code> file. Browser overrides are persisted in your local session.
+          </p>
+        </div>
+
+        <!-- Default Model -->
+        <div class="settings-group">
+          <label for="modalModelSelect" class="settings-label">Active Gemini Model</label>
+          <select id="modalModelSelect" class="settings-input">
+            <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite — Ultra-fast response with high accuracy</option>
+            <option value="gemini-3.5-flash">Gemini 3.5 Flash — Advanced reasoning & instruction following</option>
+            <option value="gemini-3.6-flash">Gemini 3.6 Flash — Next-generation Flash model</option>
+            <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite — Lightweight & cost-efficient</option>
+          </select>
+        </div>
+
+        <!-- System Prompt Instruction -->
+        <div class="settings-group">
+          <label for="systemInstructionInput" class="settings-label">Companion Personality & System Persona</label>
+          <textarea
+            id="systemInstructionInput"
+            class="settings-textarea"
+            rows="3"
+            placeholder="Custom instructions for how the AI should behave, style, and tone..."
+          ></textarea>
+        </div>
+
+        <!-- Temperature Slider -->
+        <div class="settings-group">
+          <div class="settings-label-row">
+            <label for="temperatureSlider" class="settings-label">Creativity / Temperature</label>
+            <span id="tempValueDisplay" class="temp-display">0.7</span>
+          </div>
+          <input
+            type="range"
+            id="temperatureSlider"
+            min="0"
+            max="1"
+            step="0.05"
+            value="0.7"
+            class="settings-range"
+          >
+          <div class="range-labels">
+            <span>Precise (0.0)</span>
+            <span>Balanced (0.7)</span>
+            <span>Creative (1.0)</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button id="cancelSettingsBtn" class="btn btn-secondary">Cancel</button>
+        <button id="saveSettingsBtn" class="btn btn-primary">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- CONFIRMATION MODAL -->
+  <!-- ==================================================================== -->
+  <div id="confirmModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="confirmModalTitle">
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3 id="confirmModalTitle" class="modal-title">Confirm Action</h3>
+        <button id="closeConfirmModalBtn" class="icon-btn-tiny" aria-label="Close modal">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p id="confirmModalMessage" class="confirm-message">Are you sure you want to proceed?</p>
+      </div>
+      <div class="modal-footer">
+        <button id="cancelConfirmBtn" class="btn btn-secondary">Cancel</button>
+        <button id="actionConfirmBtn" class="btn btn-danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- Application Logic -->
+  <script src="script.js"></script>
+</body>
+</html>
