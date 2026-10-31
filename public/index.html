@@ -642,6 +642,13 @@
                 </div>
 
                 <div class="input-tools-right">
+                  <button id="imageGenBtn" class="inline-tool-btn" title="Create AI Image (/image <prompt>)" aria-label="Generate AI Image">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                  </button>
                   <button id="inlineMicBtn" class="inline-mic-btn" title="Click to speak aloud" aria-label="Voice input">
                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
                       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
@@ -798,6 +805,36 @@
       <div class="modal-footer">
         <button id="cancelConfirmBtn" class="btn btn-secondary">Cancel</button>
         <button id="actionConfirmBtn" class="btn btn-danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================================================================== -->
+  <!-- FULLSCREEN IMAGE LIGHTBOX MODAL -->
+  <!-- ==================================================================== -->
+  <div id="imageLightboxModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-label="Fullscreen Image Preview">
+    <div class="lightbox-container">
+      <button id="closeLightboxBtn" class="lightbox-close-btn" aria-label="Close fullscreen preview">
+        <svg viewBox="0 0 24 24" width="22" height="22" stroke="currentColor" stroke-width="2" fill="none">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+      <div class="lightbox-image-box">
+        <img id="lightboxImg" src="" alt="Fullscreen AI Image Preview" class="lightbox-img" />
+      </div>
+      <div class="lightbox-footer">
+        <p id="lightboxPrompt" class="lightbox-prompt-text"></p>
+        <div class="lightbox-actions">
+          <a id="lightboxDownloadBtn" href="#" download="yantra-ai-image.jpg" class="btn btn-primary btn-sm">
+            <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download High-Res</span>
+          </a>
+        </div>
       </div>
     </div>
   </div>

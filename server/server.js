@@ -463,6 +463,108 @@ app.post('/api/chat', async (req, res) => {
   return res.status(parsed.status).json({ error: parsed.message });
 });
 
+/**
+ * POST /api/generate-image
+ * Generates high-fidelity AI images.
+ * Uses Gemini Flash Lite to expand and refine the prompt into an optimal visual specification,
+ * then synthesizes the image via Flux text-to-image engine.
+ * Converts to base64 Data URI for complete permanence and instant downloads.
+ */
+app.post('/api/generate-image', async (req, res) => {
+  const { prompt, aspectRatio = '1:1' } = req.body;
+  if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+    return res.status(400).json({ error: 'Image prompt is required.' });
+  }
+
+  const cleanPrompt = prompt.trim();
+  const apiKey = resolveApiKey(req);
+
+  // 1. Intelligent Visual Prompt Optimization using Gemini
+  let enhancedPrompt = cleanPrompt;
+  if (apiKey) {
+    try {
+      const ai = new GoogleGenAI({ apiKey });
+      const promptEnhanceRes = await ai.models.generateContent({
+        model: 'gemini-3.5-flash-lite',
+        contents: [
+          {
+            role: 'user',
+            parts: [{
+              text: `You are an expert AI prompt engineer. Convert this user idea into a vivid, detailed, photorealistic visual prompt with cinematic lighting, depth, atmosphere, textures, and composition: "${cleanPrompt}". Return ONLY the final expanded prompt without explanations, prefixes, or markdown, under 70 words.`
+            }]
+          }
+        ],
+        config: { temperature: 0.7 }
+      });
+      const generatedPrompt = promptEnhanceRes.text ? promptEnhanceRes.text.trim() : '';
+      if (generatedPrompt && generatedPrompt.length > 10) {
+        enhancedPrompt = generatedPrompt.replace(/[\n\r]+/g, ' ').replace(/^["']|["']$/g, '');
+      }
+    } catch (enhanceErr) {
+      console.warn('Prompt enhancement fallback to original prompt:', enhanceErr.message);
+      enhancedPrompt = cleanPrompt;
+    }
+  }
+
+  // 2. Aspect Ratio Resolution
+  let width = 1024;
+  let height = 1024;
+  if (aspectRatio === '16:9') {
+    width = 1280;
+    height = 720;
+  } else if (aspectRatio === '9:16') {
+    width = 720;
+    height = 1280;
+  } else if (aspectRatio === '4:3') {
+    width = 1024;
+    height = 768;
+  }
+
+  // 3. Image Synthesis
+  try {
+    const seed = Math.floor(Math.random() * 10000000);
+    const encodedPrompt = encodeURIComponent(enhancedPrompt);
+    const targetUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&model=flux`;
+
+    // Fetch and encode as Base64 Data URI for offline durability and instant rendering
+    const imgResponse = await fetch(targetUrl, { signal: AbortSignal.timeout(30000) });
+    if (!imgResponse.ok) {
+      throw new Error(`Image generator returned HTTP status ${imgResponse.status}`);
+    }
+
+    const arrayBuffer = await imgResponse.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64Data = buffer.toString('base64');
+    const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
+    const dataUri = `data:${mimeType};base64,${base64Data}`;
+
+    return res.json({
+      success: true,
+      imageUrl: dataUri,
+      prompt: cleanPrompt,
+      enhancedPrompt,
+      aspectRatio,
+      engine: 'flux-highres'
+    });
+  } catch (err) {
+    console.error('Image Generation Fetch Error:', err.message);
+
+    // Fallback: Return direct CDN URL if server-side buffer fetch times out
+    const seed = Math.floor(Math.random() * 10000000);
+    const encodedPrompt = encodeURIComponent(enhancedPrompt || cleanPrompt);
+    const directUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&model=flux`;
+
+    return res.json({
+      success: true,
+      imageUrl: directUrl,
+      prompt: cleanPrompt,
+      enhancedPrompt,
+      aspectRatio,
+      engine: 'flux-direct'
+    });
+  }
+});
+
 // Fallback to index.html for any unhandled routes
 app.use((req, res) => {
   res.sendFile(path.join(__dirname, '../public/index.html'));

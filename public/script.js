@@ -174,6 +174,7 @@
     // Input Area
     stopGeneratingWrapper: document.getElementById('stopGeneratingWrapper'),
     stopGeneratingBtn: document.getElementById('stopGeneratingBtn'),
+    imageGenBtn: document.getElementById('imageGenBtn'),
     inlineMicBtn: document.getElementById('inlineMicBtn'),
     chatInput: document.getElementById('chatInput'),
     sendBtn: document.getElementById('sendBtn'),
@@ -194,6 +195,13 @@
     systemInstructionInput: document.getElementById('systemInstructionInput'),
     temperatureSlider: document.getElementById('temperatureSlider'),
     tempValueDisplay: document.getElementById('tempValueDisplay'),
+
+    // Lightbox Modal
+    imageLightboxModal: document.getElementById('imageLightboxModal'),
+    closeLightboxBtn: document.getElementById('closeLightboxBtn'),
+    lightboxImg: document.getElementById('lightboxImg'),
+    lightboxPrompt: document.getElementById('lightboxPrompt'),
+    lightboxDownloadBtn: document.getElementById('lightboxDownloadBtn'),
 
     // Confirm Modal
     confirmModal: document.getElementById('confirmModal'),
@@ -1500,6 +1508,110 @@
       `;
     }
 
+    // AI Generated Image Message
+    if (msg.type === 'image') {
+      return `
+        <div class="message-row model" id="msg-row-${index}">
+          <div class="avatar ai-avatar" title="Yantra AI Visual Matrix">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="message-bubble-wrapper">
+            <div class="message-header-info">
+              <span class="message-sender">Yantra AI</span>
+              <span class="message-time">${timeFormatted}</span>
+              <span class="message-badge-tag">AI Visual Matrix</span>
+            </div>
+            <div class="message-bubble">
+              <div class="ai-image-card">
+                <div class="ai-image-wrapper" data-action="lightbox" data-msg-index="${index}" title="Click to expand">
+                  <img src="${msg.imageUrl}" alt="${escapeHtml(msg.prompt || 'Generated Image')}" class="ai-generated-img" loading="lazy" />
+                  <div class="ai-image-overlay">
+                    <span class="ai-image-expand-hint">
+                      <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none">
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <polyline points="9 21 3 21 3 15"></polyline>
+                        <line x1="21" y1="3" x2="14" y2="10"></line>
+                        <line x1="3" y1="21" x2="10" y2="14"></line>
+                      </svg>
+                      Click to expand
+                    </span>
+                  </div>
+                </div>
+                <div class="ai-image-details">
+                  <span class="ai-image-prompt-text">"${escapeHtml(msg.prompt || '')}"</span>
+                  <div class="ai-image-actions">
+                    <a href="${msg.imageUrl}" download="yantra-ai-image-${Date.now()}.jpg" class="action-pill-btn" title="Download Image">
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                        <polyline points="7 10 12 15 17 10"></polyline>
+                        <line x1="12" y1="15" x2="12" y2="3"></line>
+                      </svg>
+                      <span>Download</span>
+                    </a>
+                    <button class="action-pill-btn" data-action="lightbox" data-msg-index="${index}" title="View Fullscreen">
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                        <polyline points="15 3 21 3 21 9"></polyline>
+                        <polyline points="9 21 3 21 3 15"></polyline>
+                        <line x1="21" y1="3" x2="14" y2="10"></line>
+                        <line x1="3" y1="21" x2="10" y2="14"></line>
+                      </svg>
+                      <span>Fullscreen</span>
+                    </button>
+                    <button class="action-pill-btn" data-action="speak-msg" data-msg-index="${index}" title="Speak prompt aloud">
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                        <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                      </svg>
+                      <span>Speak</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // AI Synthesizing Image Shimmer
+    if (msg.type === 'image_loading') {
+      return `
+        <div class="message-row model" id="msg-row-${index}">
+          <div class="avatar ai-avatar" title="Yantra AI Visual Matrix">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
+              <path d="M12 2L14.4 9.6L22 12L14.4 14.4L12 22L9.6 14.4L2 12L9.6 9.6L12 2Z" fill="currentColor"/>
+            </svg>
+          </div>
+          <div class="message-bubble-wrapper">
+            <div class="message-header-info">
+              <span class="message-sender">Yantra AI</span>
+              <span class="message-time">${timeFormatted}</span>
+              <span class="message-badge-tag">Synthesizing</span>
+            </div>
+            <div class="message-bubble">
+              <div class="ai-image-loading-card">
+                <div class="ai-image-shimmer-box">
+                  <div class="shimmer-core">
+                    <svg viewBox="0 0 24 24" width="28" height="28" stroke="currentColor" stroke-width="1.8" fill="none" class="pulse-icon">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                      <polyline points="21 15 16 10 5 21"></polyline>
+                    </svg>
+                    <span>Synthesizing neural visual matrix...</span>
+                  </div>
+                </div>
+                <div class="ai-image-prompt-row">
+                  <span class="ai-image-prompt-text">"${escapeHtml(msg.prompt || '')}"</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     // AI Message
     const renderedBody = renderMarkdown(msg.content);
     const isError = Boolean(msg.isError);
@@ -1588,6 +1700,113 @@
   }
 
   // ============================================================================
+  // AI IMAGE GENERATION ENGINE & LIGHTBOX
+  // ============================================================================
+  function detectImageRequest(text) {
+    if (!text) return null;
+    const trimmed = text.trim();
+
+    // 1. Direct slash command: /image <prompt> or /img <prompt>
+    const slashMatch = trimmed.match(/^\/(?:image|img|draw)\s+(.+)$/i);
+    if (slashMatch) return slashMatch[1].trim();
+
+    // 2. Natural language phrases:
+    const nlMatch = trimmed.match(/^(?:please\s+)?(?:generate|create|make|draw|paint|render|show me)\s+(?:an?\s+)?(?:image|picture|photo|illustration|drawing|artwork|visual|graphic)\s+(?:of|about|depicting|showing)?\s*(.+)$/i);
+    if (nlMatch && nlMatch[1] && nlMatch[1].trim().length > 1) {
+      return nlMatch[1].trim();
+    }
+
+    return null;
+  }
+
+  async function generateImageResponse(chat, aiMsgIndex, imagePrompt) {
+    state.isGenerating = true;
+    updateGeneratingUI(true);
+    AvatarController.updateState('thinking');
+
+    // Display cybernetic shimmer loading card
+    chat.messages[aiMsgIndex] = {
+      role: 'model',
+      type: 'image_loading',
+      prompt: imagePrompt,
+      timestamp: new Date().toISOString()
+    };
+    renderActiveChatMessages();
+
+    try {
+      const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-gemini-api-key': state.settings.apiKey || ''
+        },
+        body: JSON.stringify({
+          prompt: imagePrompt,
+          aspectRatio: '1:1'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success || !data.imageUrl) {
+        throw new Error(data.error || 'Failed to synthesize AI image.');
+      }
+
+      // Replace placeholder with completed image card
+      chat.messages[aiMsgIndex] = {
+        role: 'model',
+        type: 'image',
+        imageUrl: data.imageUrl,
+        prompt: imagePrompt,
+        enhancedPrompt: data.enhancedPrompt || imagePrompt,
+        content: `[AI Image: ${imagePrompt}]`,
+        timestamp: new Date().toISOString()
+      };
+
+      saveChats();
+      renderActiveChatMessages();
+      AvatarController.updateState('speaking');
+
+      // Voice Companion Speaks
+      const spokenSummary = `I have generated the image of ${imagePrompt.substring(0, 48)} for you.`;
+      VoiceEngine.speakResponse(spokenSummary);
+      showToast('AI image synthesized successfully!', 'success');
+
+    } catch (err) {
+      console.error('Image Generation Error:', err);
+      chat.messages[aiMsgIndex] = {
+        role: 'model',
+        content: `Failed to generate image: ${err.message}`,
+        isError: true,
+        timestamp: new Date().toISOString()
+      };
+      saveChats();
+      renderActiveChatMessages();
+      AvatarController.updateState('idle');
+      showToast(err.message, 'error');
+    } finally {
+      state.isGenerating = false;
+      updateGeneratingUI(false);
+    }
+  }
+
+  function openImageLightbox(msgIndex) {
+    const activeChat = getActiveChat();
+    if (!activeChat || !activeChat.messages[msgIndex]) return;
+    const msg = activeChat.messages[msgIndex];
+    if (msg.type !== 'image' || !msg.imageUrl) return;
+
+    if (elements.lightboxImg) elements.lightboxImg.src = msg.imageUrl;
+    if (elements.lightboxPrompt) elements.lightboxPrompt.textContent = `"${msg.prompt || ''}"`;
+    if (elements.lightboxDownloadBtn) elements.lightboxDownloadBtn.href = msg.imageUrl;
+    if (elements.imageLightboxModal) elements.imageLightboxModal.classList.remove('hidden');
+  }
+
+  function closeImageLightbox() {
+    if (elements.imageLightboxModal) elements.imageLightboxModal.classList.add('hidden');
+  }
+
+  // ============================================================================
   // SEND MESSAGE & STREAMING ENGINE (WITH AUTONOMOUS VOICE TRIGGER)
   // ============================================================================
   async function sendMessage(promptOverride = null) {
@@ -1644,6 +1863,13 @@
     saveChats();
     renderSidebarHistory();
     renderActiveChatMessages();
+
+    // Check for Image Generation intent
+    const imagePrompt = detectImageRequest(text);
+    if (imagePrompt) {
+      await generateImageResponse(activeChat, aiMsgIndex, imagePrompt);
+      return;
+    }
 
     // Start Streaming
     await streamAiResponse(activeChat, aiMsgIndex);
@@ -2284,6 +2510,14 @@
 
     // Messages Container Action Delegated Click
     elements.messagesContainer.addEventListener('click', (e) => {
+      // Lightbox Click on Image Card
+      const lightboxTrigger = e.target.closest('[data-action="lightbox"]');
+      if (lightboxTrigger) {
+        const msgIndex = parseInt(lightboxTrigger.getAttribute('data-msg-index'), 10);
+        openImageLightbox(msgIndex);
+        return;
+      }
+
       const actionBtn = e.target.closest('.action-pill-btn');
       if (!actionBtn) return;
 
@@ -2291,11 +2525,25 @@
       const msgIndex = parseInt(actionBtn.getAttribute('data-msg-index'), 10);
 
       if (action === 'copy-msg') copyMessageText(msgIndex);
-      else if (action === 'regenerate') regenerateMessage(msgIndex);
+      else if (action === 'regenerate') {
+        const activeChat = getActiveChat();
+        if (activeChat && activeChat.messages[msgIndex]) {
+          const msg = activeChat.messages[msgIndex];
+          if (msg.type === 'image' && msg.prompt) {
+            generateImageResponse(activeChat, msgIndex, msg.prompt);
+          } else {
+            regenerateMessage(msgIndex);
+          }
+        }
+      }
       else if (action === 'speak-msg') {
         const activeChat = getActiveChat();
         if (activeChat && activeChat.messages[msgIndex]) {
-          VoiceEngine.speakResponse(activeChat.messages[msgIndex].content);
+          const msg = activeChat.messages[msgIndex];
+          const textToSpeak = msg.type === 'image' 
+            ? `Generated image of ${msg.prompt || 'your idea'}.`
+            : msg.content;
+          VoiceEngine.speakResponse(textToSpeak);
         }
       }
     });
@@ -2315,6 +2563,43 @@
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         sendMessage();
+      }
+    });
+
+    // Image Generation Toolbar Button
+    if (elements.imageGenBtn) {
+      elements.imageGenBtn.addEventListener('click', () => {
+        const currentVal = elements.chatInput.value.trim();
+        if (currentVal) {
+          if (!currentVal.startsWith('/image') && !currentVal.startsWith('/img')) {
+            elements.chatInput.value = `/image ${currentVal}`;
+          }
+          sendMessage();
+        } else {
+          elements.chatInput.value = '/image ';
+          elements.chatInput.focus();
+          autoResizeTextarea();
+          updateSendButtonState();
+          showToast('Describe the image you want to create and press Send!', 'info');
+        }
+      });
+    }
+
+    // Lightbox Modal Controls
+    if (elements.closeLightboxBtn) {
+      elements.closeLightboxBtn.addEventListener('click', closeImageLightbox);
+    }
+    if (elements.imageLightboxModal) {
+      elements.imageLightboxModal.addEventListener('click', (e) => {
+        if (e.target === elements.imageLightboxModal) {
+          closeImageLightbox();
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeImageLightbox();
       }
     });
 

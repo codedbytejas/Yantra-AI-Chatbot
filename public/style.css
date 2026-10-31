@@ -1744,6 +1744,250 @@ html, body {
 }
 
 /* ==============================================================================
+   AI IMAGE GENERATION CARDS & LIGHTBOX
+   ============================================================================== */
+.message-badge-tag {
+  font-size: 0.65rem;
+  font-family: 'Fira Code', monospace;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  background: rgba(2, 132, 199, 0.12);
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  margin-left: 6px;
+  letter-spacing: 0.04em;
+}
+
+.ai-image-card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  margin-top: 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ai-image-card:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 4px 18px var(--accent-glow);
+}
+
+.ai-image-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-height: 440px;
+  background: #0a0f1d;
+  cursor: pointer;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-generated-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ai-image-wrapper:hover .ai-generated-img {
+  transform: scale(1.03);
+}
+
+.ai-image-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 60%, rgba(5, 8, 17, 0.75) 100%);
+  display: flex;
+  align-items: flex-end;
+  padding: 12px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.ai-image-wrapper:hover .ai-image-overlay {
+  opacity: 1;
+}
+
+.ai-image-expand-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.ai-image-details {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+}
+
+.ai-image-prompt-text {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.35;
+}
+
+.ai-image-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* Loading Shimmer Card */
+.ai-image-loading-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ai-image-shimmer-box {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: linear-gradient(90deg, rgba(2, 132, 199, 0.05) 0%, rgba(2, 132, 199, 0.16) 50%, rgba(2, 132, 199, 0.05) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite linear;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-subtle);
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent-cyan);
+  font-size: 0.8rem;
+  font-family: 'Orbitron', sans-serif;
+  font-weight: 600;
+  text-align: center;
+  padding: 10px;
+}
+
+.pulse-icon {
+  animation: pulseDot 1s infinite alternate;
+}
+
+/* Lightbox Fullscreen Modal */
+.lightbox-container {
+  position: relative;
+  max-width: 92vw;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  z-index: 110;
+}
+
+.lightbox-close-btn {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #0f172a;
+  border: 1px solid var(--border-subtle);
+  color: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 120;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.lightbox-close-btn:hover {
+  background: #ef4444;
+  transform: scale(1.08);
+}
+
+.lightbox-image-box {
+  max-width: 88vw;
+  max-height: 74vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #050811;
+}
+
+.lightbox-img {
+  max-width: 100%;
+  max-height: 74vh;
+  object-fit: contain;
+  display: block;
+}
+
+.lightbox-footer {
+  width: 100%;
+  max-width: 620px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(10px);
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lightbox-prompt-text {
+  font-size: 0.8rem;
+  color: #f8fafc;
+  font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-actions {
+  flex-shrink: 0;
+}
+
+/* ==============================================================================
    MARKDOWN & CODE STYLING
    ============================================================================== */
 .markdown-body {
@@ -2100,6 +2344,7 @@ html, body {
   flex-shrink: 0;
 }
 
+.inline-tool-btn,
 .inline-mic-btn {
   position: static;
   background: var(--bg-card);
@@ -2118,6 +2363,7 @@ html, body {
   flex-shrink: 0;
 }
 
+.inline-tool-btn:hover,
 .inline-mic-btn:hover {
   background: rgba(2, 132, 199, 0.1);
   border-color: var(--accent-cyan);
@@ -2849,6 +3095,7 @@ html, body {
     gap: 6px;
   }
 
+  .inline-tool-btn,
   .inline-mic-btn {
     position: static;
     width: 30px;
