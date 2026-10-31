@@ -642,6 +642,13 @@
                 </div>
 
                 <div class="input-tools-right">
+                  <button id="webSearchBtn" class="inline-tool-btn active-tool" title="Live Web Search: Auto (Click to cycle: Auto / Always ON / OFF)" aria-label="Toggle Live Web Search">
+                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="2" y1="12" x2="22" y2="12"></line>
+                      <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                    </svg>
+                  </button>
                   <button id="imageGenBtn" class="inline-tool-btn" title="Create AI Image (/image <prompt>)" aria-label="Generate AI Image">
                     <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
                       <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
@@ -756,6 +763,22 @@
           </div>
           <p class="settings-help">
             Leave blank to use free public community clusters (AI Horde & Sana). Or paste a free token from <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" style="color: var(--color-cyan); text-decoration: underline;">huggingface.co</a> for instant, dedicated 1024x1024 FLUX.1 generation without queues.
+          </p>
+        </div>
+
+        <!-- Live Web Search Grounding Mode -->
+        <div class="settings-group">
+          <label for="modalWebSearchSelect" class="settings-label">
+            Live Web Search Grounding
+            <span class="settings-label-badge">Real-Time Web Data</span>
+          </label>
+          <select id="modalWebSearchSelect" class="settings-input">
+            <option value="auto">Auto (Recommended) — Searches the web on current events, news & live facts</option>
+            <option value="on">Always ON — Searches the web on every question</option>
+            <option value="off">OFF — Uses AI model training knowledge only</option>
+          </select>
+          <p class="settings-help">
+            Retrieves live up-to-the-minute web search results to answer questions about today, news, weather, and real-time facts with sources.
           </p>
         </div>
 

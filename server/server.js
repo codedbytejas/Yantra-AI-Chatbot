@@ -246,10 +246,193 @@ app.post('/api/validate-key', async (req, res) => {
   }
 });
 
+// ==============================================================================
+// Real-Time Live Web Search Engine (Web RAG Grounding)
+// ==============================================================================
+
+/**
+ * Clean and extract optimal search keywords from natural conversation text.
+ */
+function extractSearchQuery(userText) {
+  let q = userText.trim();
+  // Strip slash commands
+  q = q.replace(/^\/(?:search|web|google|find)\s+/i, '');
+  // Strip common conversational request prefixes
+  q = q.replace(/^(?:please\s+)?(?:tell me|can you tell me|find out|search for|look up|what is|what are|what's|who is|who are|who's|give me|check|explain the current)\s+/i, '');
+  // Strip trailing punctuation
+  q = q.replace(/[?!.]+$/, '').trim();
+  return q || userText.trim();
+}
+
+/**
+ * Determine if a user message requires real-time live web search data.
+ */
+function shouldSearchWeb(userText, webSearchMode = 'auto') {
+  if (webSearchMode === 'off') return false;
+  if (webSearchMode === 'on') return true;
+
+  if (!userText || typeof userText !== 'string') return false;
+  const text = userText.trim().toLowerCase();
+
+  // Explicit slash commands
+  if (text.startsWith('/search') || text.startsWith('/web') || text.startsWith('/google') || text.startsWith('/find')) {
+    return true;
+  }
+
+  // Keywords that require current, temporal, or live real-world data
+  const liveTriggers = [
+    'latest', 'current', 'news', 'today', 'recent', 'live', 'weather', 'score',
+    'price', 'update', 'who is currently', 'happening', '2025', '2026', 'now',
+    'yesterday', 'tomorrow', 'stock', 'crypto', 'bitcoin', 'election', 'schedule',
+    'release date', 'when did', 'winner of', 'who won', 'match score', 'population',
+    'trending', 'newest', 'prime minister', 'president of', 'ceo of', 'standings'
+  ];
+
+  for (const trigger of liveTriggers) {
+    if (text.includes(trigger)) return true;
+  }
+
+  // Common live question patterns
+  const questionPatterns = [
+    /\bwhat(?:'s| is) (?:the )?(?:current|latest|newest|today's)/i,
+    /\bwho is (?:the )?(?:current|latest)/i,
+    /\bhow much is (?:bitcoin|btc|eth|gold|apple|tesla)/i,
+    /\bwhere is .* (?:now|currently)/i
+  ];
+
+  return questionPatterns.some(pattern => pattern.test(text));
+}
+
+/**
+ * Perform live web search using DuckDuckGo HTML endpoint (zero-key, uncapped, fast)
+ * or optional Tavily AI Search if configured.
+ */
+async function performLiveWebSearch(query) {
+  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    return null;
+  }
+
+  const cleanQuery = query.trim().substring(0, 180);
+
+  // 1. Optional Tavily Search Integration (if TAVILY_API_KEY is configured in .env)
+  const tavilyKey = (process.env.TAVILY_API_KEY || '').trim();
+  if (tavilyKey) {
+    try {
+      const tavilyRes = await fetch('https://api.tavily.com/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          api_key: tavilyKey,
+          query: cleanQuery,
+          search_depth: 'basic',
+          include_answer: true,
+          max_results: 5
+        }),
+        signal: AbortSignal.timeout(4500)
+      });
+      if (tavilyRes.ok) {
+        const data = await tavilyRes.json();
+        if (Array.isArray(data.results) && data.results.length > 0) {
+          const results = data.results.map(r => ({
+            title: r.title || 'Web Source',
+            url: r.url || '',
+            snippet: r.content || ''
+          }));
+          return { query: cleanQuery, results, engine: 'tavily' };
+        }
+      }
+    } catch (tavErr) {
+      console.warn('[WebSearch] Tavily search fallback:', tavErr.message);
+    }
+  }
+
+  // 2. Primary High-Speed Live Web Search: DuckDuckGo HTML Endpoint
+  try {
+    const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(cleanQuery)}`;
+    const searchRes = await fetch(searchUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+      },
+      signal: AbortSignal.timeout(5000)
+    });
+
+    if (searchRes.ok) {
+      const html = await searchRes.text();
+      const results = [];
+      const regex = /<a rel="nofollow" class="result__a"[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>[\s\S]*?<a class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+      let match;
+      while ((match = regex.exec(html)) !== null && results.length < 5) {
+        let rawUrl = match[1];
+        let actualUrl = rawUrl;
+        const uddgMatch = rawUrl.match(/uddg=([^&]+)/);
+        if (uddgMatch) {
+          try {
+            actualUrl = decodeURIComponent(uddgMatch[1]);
+          } catch (_) {}
+        }
+        const title = match[2]
+          .replace(/<[^>]+>/g, '')
+          .replace(/&quot;/g, '"')
+          .replace(/&#x27;/g, "'")
+          .replace(/&amp;/g, '&')
+          .trim();
+        const snippet = match[3]
+          .replace(/<[^>]+>/g, '')
+          .replace(/&quot;/g, '"')
+          .replace(/&#x27;/g, "'")
+          .replace(/&amp;/g, '&')
+          .trim();
+
+        if (title && snippet) {
+          results.push({ title, snippet, url: actualUrl });
+        }
+      }
+
+      if (results.length > 0) {
+        return { query: cleanQuery, results, engine: 'duckduckgo' };
+      }
+    }
+  } catch (ddgErr) {
+    console.warn('[WebSearch] DuckDuckGo search error:', ddgErr.message);
+  }
+
+  return null;
+}
+
+/**
+ * Build clean Grounding Context instructions for Gemini.
+ */
+function buildGroundingContext(searchResults) {
+  if (!searchResults || !searchResults.results || searchResults.results.length === 0) {
+    return '';
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-US', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC'
+  });
+
+  let block = `\n\n[LIVE REAL-TIME WEB SEARCH GROUNDING DATA - Captured: ${dateStr}]\n`;
+  block += `Search Query: "${searchResults.query}"\n`;
+  block += `Verified Web Results (${searchResults.results.length} sources):\n\n`;
+
+  searchResults.results.forEach((r, idx) => {
+    block += `[Source ${idx + 1}]: "${r.title}"\n`;
+    block += `URL: ${r.url}\n`;
+    block += `Snippet: ${r.snippet}\n\n`;
+  });
+
+  block += `[Instruction to AI: You have direct access to live internet data via the search results above. Answer the user's question directly and authoritatively using these findings. Always cite your sources using clean Markdown links in your response, e.g. [Source Title](URL). If the query refers to current events or today, use this real-world telemetry.]\n`;
+
+  return block;
+}
+
 /**
  * POST /api/chat/stream
  * Server-Sent Events (SSE) streaming endpoint for real-time AI responses.
- * Includes automatic model fallback and chunk text extraction.
+ * Includes automatic live web search grounding, model fallback, and chunk text extraction.
  */
 app.post('/api/chat/stream', async (req, res) => {
   const apiKey = resolveApiKey(req);
@@ -265,7 +448,8 @@ app.post('/api/chat/stream', async (req, res) => {
     messages = [],
     model = DEFAULT_MODEL,
     systemInstruction,
-    temperature = 0.7
+    temperature = 0.7,
+    webSearchMode = 'auto'
   } = req.body;
 
   const formattedContents = formatMessagesForGemini(messages);
@@ -289,6 +473,40 @@ app.post('/api/chat/stream', async (req, res) => {
     }
   });
 
+  // Extract last user message to check for live web search intent
+  const lastUserMsg = Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : null;
+  const userText = lastUserMsg && typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '';
+
+  let searchResults = null;
+  if (shouldSearchWeb(userText, webSearchMode)) {
+    const searchQuery = extractSearchQuery(userText);
+    console.log(`[WebSearch] Performing real-time live search for: "${searchQuery}"`);
+    try {
+      searchResults = await performLiveWebSearch(searchQuery);
+    } catch (sErr) {
+      console.warn('[WebSearch] Failed to fetch search results:', sErr.message);
+    }
+  }
+
+  // If live web search returned sources, inject into user context and notify client
+  if (searchResults && searchResults.results && searchResults.results.length > 0) {
+    // Ground last user message with live web results
+    const lastContent = formattedContents[formattedContents.length - 1];
+    if (lastContent && lastContent.role === 'user' && Array.isArray(lastContent.parts) && lastContent.parts[0]) {
+      lastContent.parts[0].text += buildGroundingContext(searchResults);
+    }
+
+    // Emit live webSearch metadata event to frontend client
+    res.write(`data: ${JSON.stringify({
+      webSearch: {
+        active: true,
+        query: searchResults.query,
+        sources: searchResults.results,
+        engine: searchResults.engine
+      }
+    })}\n\n`);
+  }
+
   const ai = new GoogleGenAI({ apiKey });
 
   // Prepare model candidates to attempt (requested model, then fallbacks)
@@ -305,39 +523,19 @@ app.post('/api/chat/stream', async (req, res) => {
     if (!isClientConnected) break;
 
     try {
-      console.log(`[Stream] Initiating stream with model: ${candidateModel}`);
+      console.log(`[Stream] Initiating stream with model: ${candidateModel} (Web Search: ${searchResults ? 'Active' : 'Off'})`);
 
       const activeInstruction = buildSystemInstruction(systemInstruction);
       const config = {
         systemInstruction: activeInstruction,
-        temperature: Math.max(0, Math.min(1.0, Number(temperature) || 0.7)),
-        tools: [{ googleSearch: {} }] // Attempt live Google Search Grounding
+        temperature: Math.max(0, Math.min(1.0, Number(temperature) || 0.7))
       };
 
-      let streamResponse;
-      try {
-        streamResponse = await ai.models.generateContentStream({
-          model: candidateModel,
-          contents: formattedContents,
-          config
-        });
-      } catch (streamInitErr) {
-        // If Google Search tool is rejected (e.g. 429 quota limit on free tier without billing profile),
-        // gracefully fall back to generation with temporal grounding
-        const isQuotaErr = streamInitErr.status === 429 ||
-          (streamInitErr.message && (streamInitErr.message.includes('429') || streamInitErr.message.includes('RESOURCE_EXHAUSTED')));
-        if (config.tools && isQuotaErr) {
-          console.log(`[Stream] Search Grounding quota unavailable on current key (429). Falling back to direct generation...`);
-          delete config.tools;
-          streamResponse = await ai.models.generateContentStream({
-            model: candidateModel,
-            contents: formattedContents,
-            config
-          });
-        } else {
-          throw streamInitErr;
-        }
-      }
+      const streamResponse = await ai.models.generateContentStream({
+        model: candidateModel,
+        contents: formattedContents,
+        config
+      });
 
       let sentAnyChunk = false;
 
@@ -384,7 +582,7 @@ app.post('/api/chat/stream', async (req, res) => {
 
 /**
  * POST /api/chat
- * Non-streaming fallback endpoint with model fallback.
+ * Non-streaming endpoint with real-time web search grounding and model fallback.
  */
 app.post('/api/chat', async (req, res) => {
   const apiKey = resolveApiKey(req);
@@ -398,12 +596,35 @@ app.post('/api/chat', async (req, res) => {
     messages = [],
     model = DEFAULT_MODEL,
     systemInstruction,
-    temperature = 0.7
+    temperature = 0.7,
+    webSearchMode = 'auto'
   } = req.body;
 
   const formattedContents = formatMessagesForGemini(messages);
   if (formattedContents.length === 0) {
     return res.status(400).json({ error: 'Messages array is empty or contains invalid content.' });
+  }
+
+  // Extract last user message to check for live web search intent
+  const lastUserMsg = Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : null;
+  const userText = lastUserMsg && typeof lastUserMsg.content === 'string' ? lastUserMsg.content : '';
+
+  let searchResults = null;
+  if (shouldSearchWeb(userText, webSearchMode)) {
+    const searchQuery = extractSearchQuery(userText);
+    console.log(`[Chat] Performing real-time live search for: "${searchQuery}"`);
+    try {
+      searchResults = await performLiveWebSearch(searchQuery);
+    } catch (sErr) {
+      console.warn('[Chat] Failed to fetch search results:', sErr.message);
+    }
+  }
+
+  if (searchResults && searchResults.results && searchResults.results.length > 0) {
+    const lastContent = formattedContents[formattedContents.length - 1];
+    if (lastContent && lastContent.role === 'user' && Array.isArray(lastContent.parts) && lastContent.parts[0]) {
+      lastContent.parts[0].text += buildGroundingContext(searchResults);
+    }
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -419,37 +640,26 @@ app.post('/api/chat', async (req, res) => {
       const activeInstruction = buildSystemInstruction(systemInstruction);
       const config = {
         systemInstruction: activeInstruction,
-        temperature: Math.max(0, Math.min(1.0, Number(temperature) || 0.7)),
-        tools: [{ googleSearch: {} }] // Attempt live Google Search Grounding
+        temperature: Math.max(0, Math.min(1.0, Number(temperature) || 0.7))
       };
 
-      let response;
-      try {
-        response = await ai.models.generateContent({
-          model: candidateModel,
-          contents: formattedContents,
-          config
-        });
-      } catch (genErr) {
-        const isQuotaErr = genErr.status === 429 ||
-          (genErr.message && (genErr.message.includes('429') || genErr.message.includes('RESOURCE_EXHAUSTED')));
-        if (config.tools && isQuotaErr) {
-          delete config.tools;
-          response = await ai.models.generateContent({
-            model: candidateModel,
-            contents: formattedContents,
-            config
-          });
-        } else {
-          throw genErr;
-        }
-      }
+      const response = await ai.models.generateContent({
+        model: candidateModel,
+        contents: formattedContents,
+        config
+      });
 
       const text = response.text || '';
       if (text.trim().length > 0) {
         return res.json({
           text,
-          model: candidateModel
+          model: candidateModel,
+          webSearch: searchResults ? {
+            active: true,
+            query: searchResults.query,
+            sources: searchResults.results,
+            engine: searchResults.engine
+          } : null
         });
       }
     } catch (err) {

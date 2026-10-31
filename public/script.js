@@ -23,6 +23,7 @@
     model: 'gemini-3.5-flash-lite',
     apiKey: '',
     hfToken: '',
+    webSearchMode: 'auto', // 'auto' | 'on' | 'off'
     systemInstruction:
       'You are Yantra AI, an advanced, autonomous voice AI companion and intelligence partner powered by Google Gemini. ' +
       'You have a warm, natural, intelligent, and articulate personality. ' +
@@ -175,6 +176,7 @@
     // Input Area
     stopGeneratingWrapper: document.getElementById('stopGeneratingWrapper'),
     stopGeneratingBtn: document.getElementById('stopGeneratingBtn'),
+    webSearchBtn: document.getElementById('webSearchBtn'),
     imageGenBtn: document.getElementById('imageGenBtn'),
     inlineMicBtn: document.getElementById('inlineMicBtn'),
     chatInput: document.getElementById('chatInput'),
@@ -195,6 +197,7 @@
     testKeyText: document.getElementById('testKeyText'),
     testKeyFeedback: document.getElementById('testKeyFeedback'),
     modalModelSelect: document.getElementById('modalModelSelect'),
+    modalWebSearchSelect: document.getElementById('modalWebSearchSelect'),
     systemInstructionInput: document.getElementById('systemInstructionInput'),
     temperatureSlider: document.getElementById('temperatureSlider'),
     tempValueDisplay: document.getElementById('tempValueDisplay'),
@@ -469,6 +472,7 @@
         .replace(/`([^`]+)`/g, '$1')
         .replace(/!\[.*?\]\(.*?\)/g, '')
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+        .replace(/\[\d+(?:,\s*\d+)*\]/g, '')
         // Strip markdown decoration
         .replace(/[#*_~>]/g, '')
         .replace(/\|.*?\|/g, '')
@@ -1079,11 +1083,13 @@
 
     if (elements.modelSelector) elements.modelSelector.value = state.settings.model;
     if (elements.modalModelSelect) elements.modalModelSelect.value = state.settings.model;
+    if (elements.modalWebSearchSelect) elements.modalWebSearchSelect.value = state.settings.webSearchMode || 'auto';
     if (elements.apiKeyInput) elements.apiKeyInput.value = state.settings.apiKey;
     if (elements.hfApiKeyInput) elements.hfApiKeyInput.value = state.settings.hfToken || '';
     if (elements.systemInstructionInput) elements.systemInstructionInput.value = state.settings.systemInstruction;
     if (elements.temperatureSlider) elements.temperatureSlider.value = state.settings.temperature;
     if (elements.tempValueDisplay) elements.tempValueDisplay.textContent = state.settings.temperature;
+    updateWebSearchButtonUI();
 
     // Chats
     try {
@@ -1124,6 +1130,23 @@
     try {
       localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(state.settings));
     } catch (_) {}
+  }
+
+  function updateWebSearchButtonUI() {
+    if (!elements.webSearchBtn) return;
+    const mode = state.settings.webSearchMode || 'auto';
+    elements.webSearchBtn.classList.remove('active-tool', 'glow-cyan', 'tool-disabled');
+
+    if (mode === 'auto') {
+      elements.webSearchBtn.classList.add('active-tool');
+      elements.webSearchBtn.title = 'Live Web Search: Auto (Active on real-world queries)';
+    } else if (mode === 'on') {
+      elements.webSearchBtn.classList.add('active-tool', 'glow-cyan');
+      elements.webSearchBtn.title = 'Live Web Search: Always ON (Searching web on every prompt)';
+    } else {
+      elements.webSearchBtn.classList.add('tool-disabled');
+      elements.webSearchBtn.title = 'Live Web Search: OFF (Model knowledge only)';
+    }
   }
 
   function saveVoiceConfig() {
@@ -1631,6 +1654,16 @@
           <div class="message-header-info">
             <span class="message-sender">Yantra AI</span>
             <span class="message-time">${timeFormatted}</span>
+            ${msg.webSources && msg.webSources.length > 0 ? `
+              <span class="message-badge-tag web-badge">
+                <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2" fill="none">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="2" y1="12" x2="22" y2="12"></line>
+                  <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                </svg>
+                Live Web
+              </span>
+            ` : ''}
           </div>
           <div class="message-bubble">
             ${isError ? `
@@ -1657,6 +1690,45 @@
               <div class="markdown-body" id="msg-body-${index}">
                 ${renderedBody}
               </div>
+              ${msg.webSources && msg.webSources.length > 0 ? `
+                <div class="web-sources-container">
+                  <div class="web-sources-header" data-action="toggle-sources" data-msg-index="${index}" title="Click to view live sources">
+                    <div class="web-sources-label">
+                      <svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" stroke-width="2" fill="none">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="2" y1="12" x2="22" y2="12"></line>
+                        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                      </svg>
+                      <span>Grounded via Live Web (${msg.webSources.length} sources)</span>
+                    </div>
+                    <button class="web-sources-chevron-btn" aria-label="Toggle sources list">
+                      <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" stroke-width="2" fill="none">
+                        <polyline points="6 9 12 15 18 9"></polyline>
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="web-sources-drawer hidden" id="web-sources-${index}">
+                    ${msg.webSources.map((s, sIdx) => {
+                      let domain = '';
+                      try { domain = new URL(s.url).hostname.replace(/^www\./, ''); } catch (_) { domain = s.url; }
+                      return `
+                        <a href="${s.url}" target="_blank" rel="noopener noreferrer" class="web-source-card" title="${escapeHtml(s.snippet || s.title)}">
+                          <span class="source-index-num">${sIdx + 1}</span>
+                          <div class="source-info">
+                            <span class="source-card-title">${escapeHtml(s.title)}</span>
+                            <span class="source-card-url">${escapeHtml(domain)}</span>
+                          </div>
+                          <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" stroke-width="2" fill="none" class="source-ext-icon">
+                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                            <polyline points="15 3 21 3 21 9"></polyline>
+                            <line x1="10" y1="14" x2="21" y2="3"></line>
+                          </svg>
+                        </a>
+                      `;
+                    }).join('')}
+                  </div>
+                </div>
+              ` : ''}
             `}
           </div>
 
@@ -1936,7 +2008,8 @@
         messages: contextMessages,
         model: selectedModel,
         systemInstruction: state.settings.systemInstruction,
-        temperature: Number(state.settings.temperature)
+        temperature: Number(state.settings.temperature),
+        webSearchMode: state.settings.webSearchMode || 'auto'
       };
 
       const response = await fetch('/api/chat/stream', {
@@ -1987,6 +2060,12 @@
 
           if (data.error) {
             throw new Error(data.error);
+          }
+
+          if (data.webSearch && data.webSearch.active) {
+            chat.messages[aiMsgIndex].webSources = data.webSearch.sources || [];
+            chat.messages[aiMsgIndex].webQuery = data.webSearch.query || '';
+            renderActiveChatMessages();
           }
 
           if (data.text) {
@@ -2274,6 +2353,9 @@
     if (elements.hfApiKeyInput) {
       elements.hfApiKeyInput.value = state.settings.hfToken || '';
     }
+    if (elements.modalWebSearchSelect) {
+      elements.modalWebSearchSelect.value = state.settings.webSearchMode || 'auto';
+    }
     elements.modalModelSelect.value = state.settings.model || DEFAULT_SETTINGS.model;
     elements.systemInstructionInput.value = state.settings.systemInstruction || DEFAULT_SETTINGS.systemInstruction;
     elements.temperatureSlider.value = state.settings.temperature;
@@ -2293,6 +2375,9 @@
     if (elements.hfApiKeyInput) {
       state.settings.hfToken = elements.hfApiKeyInput.value.trim();
     }
+    if (elements.modalWebSearchSelect) {
+      state.settings.webSearchMode = elements.modalWebSearchSelect.value;
+    }
     state.settings.model = elements.modalModelSelect.value;
     state.settings.systemInstruction = elements.systemInstructionInput.value.trim() || DEFAULT_SETTINGS.systemInstruction;
     state.settings.temperature = parseFloat(elements.temperatureSlider.value);
@@ -2303,6 +2388,7 @@
 
     saveSettings();
     updateApiStatusUI();
+    updateWebSearchButtonUI();
     TelemetryMonitor.update();
     closeSettingsModal();
     showToast('Settings saved successfully', 'success');
@@ -2555,6 +2641,18 @@
         return;
       }
 
+      // Web Sources Drawer Toggle
+      const sourcesTrigger = e.target.closest('[data-action="toggle-sources"]');
+      if (sourcesTrigger) {
+        const msgIndex = parseInt(sourcesTrigger.getAttribute('data-msg-index'), 10);
+        const drawer = document.getElementById(`web-sources-${msgIndex}`);
+        if (drawer) {
+          drawer.classList.toggle('hidden');
+          sourcesTrigger.classList.toggle('expanded');
+        }
+        return;
+      }
+
       const actionBtn = e.target.closest('.action-pill-btn');
       if (!actionBtn) return;
 
@@ -2603,6 +2701,25 @@
         sendMessage();
       }
     });
+
+    // Live Web Search Toolbar Toggle Button
+    if (elements.webSearchBtn) {
+      elements.webSearchBtn.addEventListener('click', () => {
+        const current = state.settings.webSearchMode || 'auto';
+        if (current === 'auto') {
+          state.settings.webSearchMode = 'on';
+          showToast('Live Web Search: Always ON (searching web on every query)', 'success');
+        } else if (current === 'on') {
+          state.settings.webSearchMode = 'off';
+          showToast('Live Web Search: OFF (model knowledge only)', 'info');
+        } else {
+          state.settings.webSearchMode = 'auto';
+          showToast('Live Web Search: Auto Mode (active on real-world queries)', 'info');
+        }
+        saveSettings();
+        updateWebSearchButtonUI();
+      });
+    }
 
     // Image Generation Toolbar Button
     if (elements.imageGenBtn) {
