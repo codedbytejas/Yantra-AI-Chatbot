@@ -732,6 +732,33 @@
           </p>
         </div>
 
+        <!-- Hugging Face Token (Optional for dedicated fast image generation) -->
+        <div class="settings-group">
+          <label for="hfApiKeyInput" class="settings-label">
+            Hugging Face Token
+            <span class="settings-label-badge">Optional &bull; For Instant FLUX.1 Art</span>
+          </label>
+          <div class="api-key-input-wrapper">
+            <input
+              type="password"
+              id="hfApiKeyInput"
+              class="settings-input"
+              placeholder="hf_xxxxxxxxxxxxxxxxxxxx"
+              autocomplete="off"
+              spellcheck="false"
+            >
+            <button id="toggleHfKeyVisibilityBtn" class="icon-btn-tiny" type="button" aria-label="Toggle Hugging Face token visibility">
+              <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+          <p class="settings-help">
+            Leave blank to use free public community clusters (AI Horde & Sana). Or paste a free token from <a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer" style="color: var(--color-cyan); text-decoration: underline;">huggingface.co</a> for instant, dedicated 1024x1024 FLUX.1 generation without queues.
+          </p>
+        </div>
+
         <!-- Default Model -->
         <div class="settings-group">
           <label for="modalModelSelect" class="settings-label">Active Gemini Model</label>

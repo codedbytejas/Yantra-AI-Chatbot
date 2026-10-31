@@ -22,6 +22,7 @@
   const DEFAULT_SETTINGS = {
     model: 'gemini-3.5-flash-lite',
     apiKey: '',
+    hfToken: '',
     systemInstruction:
       'You are Yantra AI, an advanced, autonomous voice AI companion and intelligence partner powered by Google Gemini. ' +
       'You have a warm, natural, intelligent, and articulate personality. ' +
@@ -187,6 +188,8 @@
     saveSettingsBtn: document.getElementById('saveSettingsBtn'),
     apiKeyInput: document.getElementById('apiKeyInput'),
     toggleApiKeyVisibilityBtn: document.getElementById('toggleApiKeyVisibilityBtn'),
+    hfApiKeyInput: document.getElementById('hfApiKeyInput'),
+    toggleHfKeyVisibilityBtn: document.getElementById('toggleHfKeyVisibilityBtn'),
     testApiKeyBtn: document.getElementById('testApiKeyBtn'),
     testKeySpinner: document.getElementById('testKeySpinner'),
     testKeyText: document.getElementById('testKeyText'),
@@ -1077,6 +1080,7 @@
     if (elements.modelSelector) elements.modelSelector.value = state.settings.model;
     if (elements.modalModelSelect) elements.modalModelSelect.value = state.settings.model;
     if (elements.apiKeyInput) elements.apiKeyInput.value = state.settings.apiKey;
+    if (elements.hfApiKeyInput) elements.hfApiKeyInput.value = state.settings.hfToken || '';
     if (elements.systemInstructionInput) elements.systemInstructionInput.value = state.settings.systemInstruction;
     if (elements.temperatureSlider) elements.temperatureSlider.value = state.settings.temperature;
     if (elements.tempValueDisplay) elements.tempValueDisplay.textContent = state.settings.temperature;
@@ -1738,7 +1742,8 @@
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-gemini-api-key': state.settings.apiKey || ''
+          'x-gemini-api-key': state.settings.apiKey || '',
+          'x-hf-token': state.settings.hfToken || ''
         },
         body: JSON.stringify({
           prompt: imagePrompt,
@@ -1747,18 +1752,43 @@
       });
 
       const data = await response.json();
+      let finalImageUrl = data.imageUrl;
+      let finalEnhancedPrompt = data.enhancedPrompt || imagePrompt;
 
-      if (!response.ok || !data.success || !data.imageUrl) {
-        throw new Error(data.error || 'Failed to synthesize AI image.');
+      // Direct client-side bridge fallback if server cloud IP is rate-limited
+      if (!finalImageUrl && data.canTryClient && data.clientUrl) {
+        try {
+          const directRes = await fetch(data.clientUrl, {
+            headers: { 'Accept': 'image/jpeg,image/png,image/*;q=0.9' },
+            signal: AbortSignal.timeout(12000)
+          });
+          if (directRes.status === 200 && (directRes.headers.get('content-type') || '').startsWith('image/')) {
+            const blob = await directRes.blob();
+            // Discard any payload smaller than 8KB to ensure no error text or broken banner
+            if (blob.size > 8192) {
+              const reader = new FileReader();
+              finalImageUrl = await new Promise((resolve) => {
+                reader.onloadend = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+              });
+            }
+          }
+        } catch (clientErr) {
+          console.warn('Client visual bridge fetch failed:', clientErr);
+        }
+      }
+
+      if (!finalImageUrl) {
+        throw new Error(data.error || 'AI image synthesis servers are currently at peak capacity. Please retry in a few moments, or configure a free Hugging Face token in Settings.');
       }
 
       // Replace placeholder with completed image card
       chat.messages[aiMsgIndex] = {
         role: 'model',
         type: 'image',
-        imageUrl: data.imageUrl,
+        imageUrl: finalImageUrl,
         prompt: imagePrompt,
-        enhancedPrompt: data.enhancedPrompt || imagePrompt,
+        enhancedPrompt: finalEnhancedPrompt,
         content: `[AI Image: ${imagePrompt}]`,
         timestamp: new Date().toISOString()
       };
@@ -1776,7 +1806,8 @@
       console.error('Image Generation Error:', err);
       chat.messages[aiMsgIndex] = {
         role: 'model',
-        content: `Failed to generate image: ${err.message}`,
+        content: `AI Image Generation Notice: ${err.message}`,
+        imagePrompt: imagePrompt,
         isError: true,
         timestamp: new Date().toISOString()
       };
@@ -2240,6 +2271,9 @@
   // ============================================================================
   function openSettingsModal() {
     elements.apiKeyInput.value = state.settings.apiKey || '';
+    if (elements.hfApiKeyInput) {
+      elements.hfApiKeyInput.value = state.settings.hfToken || '';
+    }
     elements.modalModelSelect.value = state.settings.model || DEFAULT_SETTINGS.model;
     elements.systemInstructionInput.value = state.settings.systemInstruction || DEFAULT_SETTINGS.systemInstruction;
     elements.temperatureSlider.value = state.settings.temperature;
@@ -2256,6 +2290,9 @@
 
   function saveSettingsFromModal() {
     state.settings.apiKey = elements.apiKeyInput.value.trim();
+    if (elements.hfApiKeyInput) {
+      state.settings.hfToken = elements.hfApiKeyInput.value.trim();
+    }
     state.settings.model = elements.modalModelSelect.value;
     state.settings.systemInstruction = elements.systemInstructionInput.value.trim() || DEFAULT_SETTINGS.systemInstruction;
     state.settings.temperature = parseFloat(elements.temperatureSlider.value);
@@ -2529,8 +2566,9 @@
         const activeChat = getActiveChat();
         if (activeChat && activeChat.messages[msgIndex]) {
           const msg = activeChat.messages[msgIndex];
-          if (msg.type === 'image' && msg.prompt) {
-            generateImageResponse(activeChat, msgIndex, msg.prompt);
+          const imgPromptToRetry = msg.imagePrompt || (msg.type === 'image' && msg.prompt);
+          if (imgPromptToRetry) {
+            generateImageResponse(activeChat, msgIndex, imgPromptToRetry);
           } else {
             regenerateMessage(msgIndex);
           }
@@ -2618,6 +2656,13 @@
       const isPassword = elements.apiKeyInput.type === 'password';
       elements.apiKeyInput.type = isPassword ? 'text' : 'password';
     });
+
+    if (elements.toggleHfKeyVisibilityBtn && elements.hfApiKeyInput) {
+      elements.toggleHfKeyVisibilityBtn.addEventListener('click', () => {
+        const isPassword = elements.hfApiKeyInput.type === 'password';
+        elements.hfApiKeyInput.type = isPassword ? 'text' : 'password';
+      });
+    }
 
     elements.temperatureSlider.addEventListener('input', (e) => {
       elements.tempValueDisplay.textContent = e.target.value;

@@ -464,11 +464,190 @@ app.post('/api/chat', async (req, res) => {
 });
 
 /**
+ * Helper to resolve Hugging Face access token for fast dedicated image generation.
+ */
+function resolveHfToken(req) {
+  const customKey = req.headers['x-hf-token'] || (req.body && req.body.hfToken);
+  if (customKey && typeof customKey === 'string' && customKey.trim().length > 0) {
+    return customKey.trim();
+  }
+  return (process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY || '').trim();
+}
+
+/**
+ * Image Generator Tier 1: Hugging Face Serverless Inference (FLUX.1-schnell / SDXL)
+ */
+async function tryHuggingFace(prompt, hfToken) {
+  if (!hfToken || typeof hfToken !== 'string' || hfToken.trim().length === 0) {
+    return null;
+  }
+  const token = hfToken.trim();
+  const models = [
+    'black-forest-labs/FLUX.1-schnell',
+    'stabilityai/stable-diffusion-xl-base-1.0'
+  ];
+
+  for (const modelId of models) {
+    try {
+      const endpoint = `https://router.huggingface.co/hf-inference/models/${modelId}`;
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ inputs: prompt }),
+        signal: AbortSignal.timeout(18000)
+      });
+
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || 'image/jpeg';
+        if (contentType.startsWith('image/')) {
+          const arrayBuffer = await res.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          if (buffer.byteLength > 5000) {
+            return {
+              dataUri: `data:${contentType};base64,${buffer.toString('base64')}`,
+              engine: `huggingface-${modelId.split('/').pop()}`
+            };
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`Hugging Face (${modelId}) inference error:`, err.message);
+    }
+  }
+  return null;
+}
+
+/**
+ * Image Generator Tier 2: Pollinations Sana Model (Opportunistic high-speed generation)
+ * Strictly verifies HTTP 200, Content-Type image/*, and size > 8KB.
+ * Automatically rejects 402/503 paywall banners.
+ */
+async function tryPollinationsSana(prompt, width = 1024, height = 1024) {
+  try {
+    const seed = Math.floor(Math.random() * 10000000);
+    const encodedPrompt = encodeURIComponent(prompt);
+    // Explicitly use model=sana (the only free model supported on image.pollinations.ai)
+    const targetUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?model=sana&width=${width}&height=${height}&seed=${seed}&nologo=true`;
+
+    const res = await fetch(targetUrl, {
+      headers: { 'Accept': 'image/jpeg,image/png,image/*;q=0.9' },
+      signal: AbortSignal.timeout(4500)
+    });
+
+    if (res.status === 200) {
+      const contentType = res.headers.get('content-type') || 'image/jpeg';
+      if (contentType.startsWith('image/')) {
+        const arrayBuffer = await res.arrayBuffer();
+        const buffer = Buffer.from(arrayBuffer);
+        // Discard any payload smaller than 8KB to ensure no error text or tiny icons
+        if (buffer.byteLength > 8192) {
+          return {
+            dataUri: `data:${contentType};base64,${buffer.toString('base64')}`,
+            engine: 'pollinations-sana'
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Pollinations Sana bypass/timeout:', err.message);
+  }
+  return null;
+}
+
+/**
+ * Image Generator Tier 3: AI Horde Crowdsourced Stable Diffusion Cluster
+ * Zero-key anonymous cluster ('0000000000').
+ * Uses curated fast models.
+ */
+async function tryAiHorde(prompt, width = 512, height = 512) {
+  try {
+    const hWidth = Math.min(Math.max(Math.round(width / 64) * 64, 384), 768);
+    const hHeight = Math.min(Math.max(Math.round(height / 64) * 64, 384), 768);
+
+    const postRes = await fetch('https://aihorde.net/api/v2/generate/async', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': '0000000000'
+      },
+      body: JSON.stringify({
+        prompt: prompt,
+        params: {
+          steps: 16,
+          width: hWidth,
+          height: hHeight,
+          sampler_name: 'k_euler_a',
+          cfg_scale: 7
+        },
+        models: [
+          'Deliberate',
+          'Dreamshaper',
+          'Realistic Vision',
+          'AbsoluteReality',
+          'ICBINP - I Can\'t Believe It\'s Not Photography'
+        ]
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
+
+    if (!postRes.ok) return null;
+    const { id } = await postRes.json();
+    if (!id) return null;
+
+    const startTime = Date.now();
+    while (Date.now() - startTime < 25000) {
+      await new Promise(r => setTimeout(r, 1800));
+      const checkRes = await fetch(`https://aihorde.net/api/v2/generate/check/${id}`, {
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!checkRes.ok) continue;
+      const checkData = await checkRes.json();
+
+      if (checkData.done) {
+        const statusRes = await fetch(`https://aihorde.net/api/v2/generate/status/${id}`, {
+          signal: AbortSignal.timeout(5000)
+        });
+        if (!statusRes.ok) break;
+        const statusData = await statusRes.json();
+        const imgUrl = statusData.generations?.[0]?.img;
+        if (!imgUrl) break;
+
+        const imgFetch = await fetch(imgUrl, { signal: AbortSignal.timeout(8000) });
+        if (imgFetch.ok) {
+          const contentType = imgFetch.headers.get('content-type') || 'image/webp';
+          const arrayBuffer = await imgFetch.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          if (buffer.byteLength > 4000) {
+            return {
+              dataUri: `data:${contentType};base64,${buffer.toString('base64')}`,
+              engine: 'ai-horde-stable-diffusion'
+            };
+          }
+        }
+        break;
+      }
+
+      if (checkData.faulted) break;
+    }
+  } catch (err) {
+    console.warn('AI Horde generation error:', err.message);
+  }
+  return null;
+}
+
+/**
  * POST /api/generate-image
- * Generates high-fidelity AI images.
- * Uses Gemini Flash Lite to expand and refine the prompt into an optimal visual specification,
- * then synthesizes the image via Flux text-to-image engine.
- * Converts to base64 Data URI for complete permanence and instant downloads.
+ * Multi-Engine Resilient AI Image Generation:
+ * 1. Intelligent Visual Prompt Optimization using Gemini Flash Lite
+ * 2. Multi-tier Image Generation Waterfall:
+ *    - Tier 1: Hugging Face Serverless FLUX.1-schnell / SDXL (if HF_TOKEN provided)
+ *    - Tier 2: Pollinations Sana Model (opportunistic high-speed, strict HTTP 200 + >8KB)
+ *    - Tier 3: AI Horde Crowdsourced Stable Diffusion Cluster (zero key, verified buffer)
+ *    - Tier 4: Client direct bridge fallback (passes clientUrl with strict browser validation)
+ * Converts all images to Base64 Data URI. NEVER returns raw URLs to avoid third-party banners.
  */
 app.post('/api/generate-image', async (req, res) => {
   const { prompt, aspectRatio = '1:1' } = req.body;
@@ -520,47 +699,73 @@ app.post('/api/generate-image', async (req, res) => {
     height = 768;
   }
 
-  // 3. Image Synthesis
+  // 3. Multi-Engine Waterfall Execution
   try {
-    const seed = Math.floor(Math.random() * 10000000);
-    const encodedPrompt = encodeURIComponent(enhancedPrompt);
-    const targetUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&model=flux`;
-
-    // Fetch and encode as Base64 Data URI for offline durability and instant rendering
-    const imgResponse = await fetch(targetUrl, { signal: AbortSignal.timeout(30000) });
-    if (!imgResponse.ok) {
-      throw new Error(`Image generator returned HTTP status ${imgResponse.status}`);
+    // Engine Tier 1: Hugging Face Serverless (FLUX.1 / SDXL)
+    const hfToken = resolveHfToken(req);
+    if (hfToken) {
+      console.log('Attempting Tier 1: Hugging Face Serverless...');
+      const hfResult = await tryHuggingFace(enhancedPrompt, hfToken);
+      if (hfResult) {
+        return res.json({
+          success: true,
+          imageUrl: hfResult.dataUri,
+          prompt: cleanPrompt,
+          enhancedPrompt,
+          aspectRatio,
+          engine: hfResult.engine
+        });
+      }
     }
 
-    const arrayBuffer = await imgResponse.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64Data = buffer.toString('base64');
-    const mimeType = imgResponse.headers.get('content-type') || 'image/jpeg';
-    const dataUri = `data:${mimeType};base64,${base64Data}`;
+    // Engine Tier 2: Pollinations Sana (Server-side fast check)
+    console.log('Attempting Tier 2: Pollinations Sana (Server)...');
+    const sanaResult = await tryPollinationsSana(enhancedPrompt, width, height);
+    if (sanaResult) {
+      return res.json({
+        success: true,
+        imageUrl: sanaResult.dataUri,
+        prompt: cleanPrompt,
+        enhancedPrompt,
+        aspectRatio,
+        engine: sanaResult.engine
+      });
+    }
 
-    return res.json({
-      success: true,
-      imageUrl: dataUri,
-      prompt: cleanPrompt,
-      enhancedPrompt,
-      aspectRatio,
-      engine: 'flux-highres'
-    });
-  } catch (err) {
-    console.error('Image Generation Fetch Error:', err.message);
+    // Engine Tier 3: AI Horde Crowdsourced Grid
+    console.log('Attempting Tier 3: AI Horde Stable Diffusion...');
+    const hordeResult = await tryAiHorde(enhancedPrompt, width, height);
+    if (hordeResult) {
+      return res.json({
+        success: true,
+        imageUrl: hordeResult.dataUri,
+        prompt: cleanPrompt,
+        enhancedPrompt,
+        aspectRatio,
+        engine: hordeResult.engine
+      });
+    }
 
-    // Fallback: Return direct CDN URL if server-side buffer fetch times out
+    // Engine Tier 4: Client direct bridge fallback
+    // If cloud server IP is temporarily throttled, send client-safe direct URL for browser fetch
     const seed = Math.floor(Math.random() * 10000000);
-    const encodedPrompt = encodeURIComponent(enhancedPrompt || cleanPrompt);
-    const directUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=${width}&height=${height}&seed=${seed}&nologo=true&model=flux`;
+    const clientUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(enhancedPrompt)}?model=sana&width=${width}&height=${height}&seed=${seed}&nologo=true`;
 
     return res.json({
-      success: true,
-      imageUrl: directUrl,
+      success: false,
+      canTryClient: true,
+      clientUrl,
       prompt: cleanPrompt,
       enhancedPrompt,
       aspectRatio,
-      engine: 'flux-direct'
+      error: 'Cloud server generation clusters busy. Switching to direct user visual bridge...'
+    });
+
+  } catch (err) {
+    console.error('Image Generation Critical Error:', err.message);
+    return res.status(503).json({
+      success: false,
+      error: 'Image generation servers are currently experiencing peak traffic. Please try again in a few moments, or add a free Hugging Face token in Settings for instant dedicated FLUX generation.'
     });
   }
 });

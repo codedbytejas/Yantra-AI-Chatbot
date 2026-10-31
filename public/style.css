@@ -2468,8 +2468,19 @@ html, body {
 }
 
 .settings-group { display: flex; flex-direction: column; gap: 5px; }
-.settings-label { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); display: flex; justify-content: space-between; }
-.settings-label-row { display: flex; justify-content: space-between; }
+.settings-label { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); display: flex; justify-content: space-between; align-items: center; }
+.settings-label-row { display: flex; justify-content: space-between; align-items: center; }
+.settings-label-badge {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 9999px;
+  padding: 1px 7px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 
 .settings-input, .settings-textarea {
   width: 100%;
